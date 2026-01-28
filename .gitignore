@@ -39,18 +39,26 @@ ENV/
 *.ipynb_checkpoints
 
 # Raw data (ephemeral, not committed)
+data/external/
+data/external/html/
+data/external/pdf/
 data/raw/
 data/html/
 data/pdf/
 data/text/
-*.html
-*.pdf
 
-# Large derived files
+# Interim processed data (not committed)
+data/interim/
+
+# Final processed data (not committed)
 data/processed/
 *.parquet
 *.pickle
 *.pkl
+
+# Temporary files
+*.html
+*.pdf
 
 # Database
 *.db

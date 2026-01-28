@@ -1,0 +1,26 @@
+# Workday AI Knowledge Graph Configuration
+# Environment variables override these values (prefix with WORKDAY_KG_)
+
+# Database
+database:
+  url: "postgresql://localhost:5432/workday_kg"
+
+# Data collection
+ingestion:
+  start_year: 2015
+  end_year: 2025
+  request_delay_seconds: 1.0
+  max_retries: 3
+  user_agent: "WorkdayKG-Academic-Research/1.0"
+
+# Model training
+modeling:
+  train_end_year: 2019
+  validation_end_year: 2021
+  random_seed: 42
+
+# Logging
+logging:
+  level: INFO
+  format: "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
+  date_format: "%Y-%m-%d %H:%M:%S"

@@ -1,5 +1,6 @@
 # Core
 python-dotenv>=1.0.0
+pyyaml>=6.0.0
 
 # Database
 psycopg2-binary>=2.9.9
@@ -31,6 +32,10 @@ ipykernel>=6.0.0
 
 # Testing
 pytest>=7.4.0
+
+# Code quality
+ruff>=0.1.0
+pre-commit>=3.5.0
 
 # Utilities
 tqdm>=4.66.0

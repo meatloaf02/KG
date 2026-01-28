@@ -1,4 +1,4 @@
-.PHONY: setup ingest build-db transform signals train clean test help
+.PHONY: setup ingest build-db transform signals train clean test lint format hooks help
 
 # Default target
 help:
@@ -11,6 +11,9 @@ help:
 	@echo "make signals    - Compute quarterly signals"
 	@echo "make train      - Train predictive model"
 	@echo "make test       - Run test suite"
+	@echo "make lint       - Check code style with ruff"
+	@echo "make format     - Format code with ruff"
+	@echo "make hooks      - Install pre-commit hooks"
 	@echo "make clean      - Remove generated files"
 
 # Environment setup
@@ -48,6 +51,19 @@ train:
 # Run tests
 test:
 	pytest tests/ -v
+
+# Lint code
+lint:
+	ruff check .
+
+# Format code
+format:
+	ruff format .
+	ruff check --fix .
+
+# Install pre-commit hooks
+hooks:
+	pre-commit install
 
 # Clean generated files
 clean:
