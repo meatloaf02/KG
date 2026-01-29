@@ -1,0 +1,8 @@
+url,source_type,content_type,category,priority,notes
+https://blog.workday.com/,blog,landing_page,,high,Workday blog main page
+https://blog.workday.com/en-us/technology,blog,category,technology,high,Technology category - AI/ML content likely here
+https://blog.workday.com/en-us/product,blog,category,product,high,Product announcements and features
+https://blog.workday.com/en-us/innovation,blog,category,innovation,high,Innovation and R&D posts
+https://blog.workday.com/en-us/human-resources,blog,category,hr,medium,HR technology posts
+https://blog.workday.com/en-us/finance,blog,category,finance,medium,Finance technology posts
+https://blog.workday.com/en-us/planning,blog,category,planning,medium,Adaptive planning posts

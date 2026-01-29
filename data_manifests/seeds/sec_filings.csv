@@ -1,0 +1,5 @@
+url,source_type,filing_type,fiscal_year,fiscal_quarter,priority,notes
+https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001327811&type=10-K&dateb=&owner=include&count=40,sec_filing,10-K,,, high,Workday 10-K annual filings index
+https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001327811&type=10-Q&dateb=&owner=include&count=40,sec_filing,10-Q,,,high,Workday 10-Q quarterly filings index
+https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001327811&type=8-K&dateb=&owner=include&count=100,sec_filing,8-K,,,medium,Workday 8-K current reports index
+https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001327811&type=DEF%2014A&dateb=&owner=include&count=40,sec_filing,DEF 14A,,,low,Workday proxy statements index

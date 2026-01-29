@@ -1,0 +1,6 @@
+url,source_type,content_type,priority,notes
+https://newsroom.workday.com/,press_release,landing_page,high,Workday newsroom main page
+https://newsroom.workday.com/press-releases,press_release,listing,high,Press releases listing page
+https://newsroom.workday.com/news,press_release,news,medium,News and announcements
+https://www.businesswire.com/portal/site/home/news/?searchParameters.companyIds=workday,press_release,wire_service,medium,Business Wire Workday releases
+https://www.prnewswire.com/search/news/?keyword=workday&page=1&pagesize=100,press_release,wire_service,medium,PR Newswire Workday releases

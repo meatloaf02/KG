@@ -1,0 +1,8 @@
+url,source_type,content_type,priority,notes
+https://investor.workday.com/,investor_relations,landing_page,high,Workday IR main page
+https://investor.workday.com/news-releases,investor_relations,press_releases,high,IR press releases listing
+https://investor.workday.com/sec-filings,investor_relations,sec_filings,high,IR SEC filings page
+https://investor.workday.com/events-and-presentations,investor_relations,events,medium,Investor events and presentations
+https://investor.workday.com/stock-information,investor_relations,stock_info,low,Stock information page
+https://investor.workday.com/corporate-governance,investor_relations,governance,low,Corporate governance documents
+https://investor.workday.com/annual-reports,investor_relations,annual_reports,high,Annual reports and letters to shareholders
