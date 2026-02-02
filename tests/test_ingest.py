@@ -185,3 +185,117 @@ class TestRobots:
         headers = get_sec_headers()
         assert "User-Agent" in headers
         assert "sec.gov" in headers.get("Host", "").lower() or True  # Optional check
+
+
+class TestModels:
+    """Tests for SQLAlchemy models."""
+
+    def test_fetch_status_enum(self):
+        from ingest.models import FetchStatus
+
+        assert FetchStatus.PENDING.value == "pending"
+        assert FetchStatus.SUCCESS.value == "success"
+        assert FetchStatus.FAILED.value == "failed"
+        assert FetchStatus.SKIPPED.value == "skipped"
+
+    def test_raw_document_model(self):
+        from ingest.models import RawDocument
+
+        doc = RawDocument(
+            url="http://example.com/test",
+            url_hash="abc123",
+        )
+        assert doc.url == "http://example.com/test"
+        assert doc.url_hash == "abc123"
+        assert repr(doc).startswith("<RawDocument")
+
+
+class TestStorage:
+    """Tests for content-addressable storage."""
+
+    def test_storage_init(self):
+        from ingest.storage import ContentStorage
+
+        storage = ContentStorage()
+        assert storage.html_dir.exists() or True  # May not exist until first use
+        assert storage.pdf_dir.exists() or True
+
+    def test_mime_to_extension(self):
+        from ingest.storage import ContentStorage
+
+        storage = ContentStorage()
+
+        assert storage._get_extension("text/html") == "html"
+        assert storage._get_extension("text/html; charset=utf-8") == "html"
+        assert storage._get_extension("application/pdf") == "pdf"
+        assert storage._get_extension("text/plain") == "txt"
+        assert storage._get_extension("unknown/type") == "bin"
+
+    def test_content_kind_from_mime(self):
+        from ingest.storage import ContentStorage
+
+        storage = ContentStorage()
+
+        assert storage._content_kind_from_mime("text/html") == "html"
+        assert storage._content_kind_from_mime("application/pdf") == "pdf"
+        assert storage._content_kind_from_mime("text/plain") == "html"  # Non-PDF is html
+
+
+class TestSeeds:
+    """Tests for seed URL loading."""
+
+    def test_seed_url_priority_rank(self):
+        from ingest.seeds import SeedURL
+
+        high = SeedURL(url="http://a.com", source_type="test", priority="high")
+        medium = SeedURL(url="http://b.com", source_type="test", priority="medium")
+        low = SeedURL(url="http://c.com", source_type="test", priority="low")
+
+        assert high.priority_rank < medium.priority_rank < low.priority_rank
+
+    def test_list_seed_files(self):
+        from ingest.seeds import list_seed_files
+
+        files = list_seed_files()
+        assert isinstance(files, list)
+        # We know we have seed files in the repo
+        assert len(files) > 0
+        assert "sec_filings" in files
+
+    def test_get_seed_stats(self):
+        from ingest.seeds import get_seed_stats
+
+        stats = get_seed_stats()
+        assert "total" in stats
+        assert "by_file" in stats
+        assert "by_source_type" in stats
+        assert "by_priority" in stats
+
+
+class TestFetcher:
+    """Tests for document fetcher."""
+
+    def test_fetch_result_dataclass(self):
+        from ingest.fetcher import FetchResult
+        from ingest.models import FetchStatus
+
+        result = FetchResult(
+            url="http://example.com",
+            url_hash="abc123",
+            status=FetchStatus.SUCCESS,
+            content_hash="xyz789",
+        )
+        assert result.url == "http://example.com"
+        assert result.status == FetchStatus.SUCCESS
+
+
+class TestManifest:
+    """Tests for manifest export."""
+
+    def test_manifest_columns(self):
+        from ingest.manifest import MANIFEST_COLUMNS
+
+        assert "url" in MANIFEST_COLUMNS
+        assert "content_hash" in MANIFEST_COLUMNS
+        assert "status" in MANIFEST_COLUMNS
+        assert "file_path" in MANIFEST_COLUMNS

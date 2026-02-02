@@ -1,4 +1,4 @@
-.PHONY: setup ingest build-db transform signals train clean test lint format hooks help
+.PHONY: setup ingest init-ingest-db ingest-stats ingest-manifest build-db transform signals train clean test lint format hooks help
 
 # Default target
 help:
@@ -26,7 +26,20 @@ setup:
 # Data ingestion
 ingest:
 	@echo "Starting data ingestion..."
-	python -m ingest.main
+	python -m ingest.run --seeds all
+
+# Initialize ingestion database
+init-ingest-db:
+	@echo "Initializing ingestion database..."
+	python -m ingest.run --init-db
+
+# Show ingestion statistics
+ingest-stats:
+	python -m ingest.run --stats
+
+# Export document manifest
+ingest-manifest:
+	python -m ingest.run --export-manifest
 
 # Database setup
 build-db:

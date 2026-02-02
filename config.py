@@ -63,6 +63,10 @@ DATABASE_URL = _get_config(
     "database.url", "WORKDAY_KG_DATABASE_URL", "postgresql://localhost:5432/workday_kg"
 )
 
+# Memgraph (for Knowledge Graph - M3+)
+MEMGRAPH_HOST = _get_config("memgraph.host", "WORKDAY_KG_MEMGRAPH_HOST", "localhost")
+MEMGRAPH_PORT = _get_config("memgraph.port", "WORKDAY_KG_MEMGRAPH_PORT", 7687, int)
+
 # Data directories (ephemeral, not in git)
 DATA_DIR = PROJECT_ROOT / "data"
 EXTERNAL_DATA_DIR = DATA_DIR / "external"

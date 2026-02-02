@@ -1,9 +1,14 @@
 # Workday AI Knowledge Graph Configuration
 # Environment variables override these values (prefix with WORKDAY_KG_)
 
-# Database
+# Database (PostgreSQL for raw document metadata)
 database:
   url: "postgresql://localhost:5432/workday_kg"
+
+# Memgraph (for Knowledge Graph - M3+)
+memgraph:
+  host: "localhost"
+  port: 7687
 
 # Data collection
 ingestion:

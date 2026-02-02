@@ -11,6 +11,23 @@ from ingest.domains import (
     is_allowed_domain,
     list_all_domains,
 )
+from ingest.fetcher import (
+    DocumentFetcher,
+    FetchResult,
+    get_fetcher,
+)
+from ingest.manifest import (
+    export_manifest,
+    format_stats,
+    get_manifest_stats,
+)
+from ingest.models import (
+    FetchStatus,
+    RawDocument,
+    create_tables,
+    get_engine,
+    get_session,
+)
 from ingest.rate_limiter import (
     RateLimiter,
     ThrottledSession,
@@ -25,6 +42,19 @@ from ingest.robots import (
     create_compliant_session,
     get_robots_checker,
     get_sec_headers,
+)
+from ingest.seeds import (
+    SeedURL,
+    get_seed_stats,
+    list_seed_files,
+    load_all_seeds,
+    load_seed_file,
+    load_seeds_by_file,
+)
+from ingest.storage import (
+    ContentStorage,
+    StorageResult,
+    get_storage,
 )
 from ingest.url_utils import (
     URLDeduplicator,
@@ -49,6 +79,20 @@ __all__ = [
     "get_domains_by_source_type",
     "is_allowed_domain",
     "list_all_domains",
+    # Fetcher
+    "DocumentFetcher",
+    "FetchResult",
+    "get_fetcher",
+    # Manifest
+    "export_manifest",
+    "format_stats",
+    "get_manifest_stats",
+    # Models
+    "FetchStatus",
+    "RawDocument",
+    "create_tables",
+    "get_engine",
+    "get_session",
     # Rate limiting
     "RateLimiter",
     "ThrottledSession",
@@ -62,6 +106,17 @@ __all__ = [
     "create_compliant_session",
     "get_robots_checker",
     "get_sec_headers",
+    # Seeds
+    "SeedURL",
+    "get_seed_stats",
+    "list_seed_files",
+    "load_all_seeds",
+    "load_seed_file",
+    "load_seeds_by_file",
+    # Storage
+    "ContentStorage",
+    "StorageResult",
+    "get_storage",
     # URL utilities
     "URLDeduplicator",
     "convert_to_https",
