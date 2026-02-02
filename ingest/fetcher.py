@@ -324,9 +324,9 @@ class DocumentFetcher:
         except Exception as e:
             # Request failed
             error_msg = str(e)
-            http_code = getattr(e, "response", None)
-            if http_code:
-                http_code = getattr(http_code, "status_code", None)
+            http_code = None
+            if hasattr(e, "response") and e.response is not None:
+                http_code = e.response.status_code
 
             self._update_record_failed(url_hash, http_code, error_msg)
             logger.error(f"Failed to fetch {url}: {error_msg}")
