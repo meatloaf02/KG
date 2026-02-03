@@ -27,6 +27,33 @@ CONTACT_EMAIL = "academic-research@example.edu"
 # Cache expiry for robots.txt (1 hour)
 ROBOTS_CACHE_TTL = 3600
 
+# Browser-like user agent for sites with bot protection
+BROWSER_USER_AGENT = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/120.0.0.0 Safari/537.36"
+)
+
+# SEC-compliant user agent (must include company/app name and contact)
+SEC_USER_AGENT = f"{DEFAULT_USER_AGENT} ({CONTACT_EMAIL})"
+
+# Domains that require browser-like headers
+BROWSER_HEADER_DOMAINS = {
+    "investor.workday.com",
+    "newsroom.workday.com",
+    "blog.workday.com",
+    "www.workday.com",
+    "seekingalpha.com",
+    "www.fool.com",
+    "www.reuters.com",
+    "techcrunch.com",
+    "www.businesswire.com",
+    "www.prnewswire.com",
+}
+
+# SEC domains
+SEC_DOMAINS = {"sec.gov", "www.sec.gov", "efts.sec.gov"}
+
 
 @dataclass
 class RobotsResult:
@@ -104,7 +131,7 @@ class RobotsChecker:
             # Fetch with our user agent
             response = requests.get(
                 robots_url,
-                headers=self._get_headers(),
+                headers=self._get_headers(robots_url),
                 timeout=10,
                 allow_redirects=True,
             )
@@ -146,12 +173,59 @@ class RobotsChecker:
 
         return parser
 
-    def _get_headers(self) -> dict[str, str]:
-        """Get request headers with user agent."""
+    def _get_headers(self, url: Optional[str] = None) -> dict[str, str]:
+        """
+        Get request headers appropriate for the target domain.
+
+        Args:
+            url: Target URL (used to determine domain-specific headers)
+
+        Returns:
+            Dictionary of HTTP headers
+        """
+        if url:
+            domain = urlparse(url).netloc.lower()
+        else:
+            domain = ""
+
+        # SEC domains: use SEC-compliant headers
+        if any(sec_domain in domain for sec_domain in SEC_DOMAINS):
+            return {
+                "User-Agent": SEC_USER_AGENT,
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Encoding": "gzip, deflate",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Host": domain,
+                "Connection": "keep-alive",
+            }
+
+        # Domains with bot protection: use browser-like headers
+        if domain in BROWSER_HEADER_DOMAINS:
+            return {
+                "User-Agent": BROWSER_USER_AGENT,
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+                "Accept-Encoding": "gzip, deflate, br",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Cache-Control": "max-age=0",
+                "Connection": "keep-alive",
+                "Sec-Ch-Ua": '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+                "Sec-Ch-Ua-Mobile": "?0",
+                "Sec-Ch-Ua-Platform": '"macOS"',
+                "Sec-Fetch-Dest": "document",
+                "Sec-Fetch-Mode": "navigate",
+                "Sec-Fetch-Site": "none",
+                "Sec-Fetch-User": "?1",
+                "Upgrade-Insecure-Requests": "1",
+            }
+
+        # Default headers for other domains
         return {
             "User-Agent": self.user_agent,
             "From": CONTACT_EMAIL,
-            "Accept": "text/plain, text/html, */*",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Accept-Encoding": "gzip, deflate",
+            "Connection": "keep-alive",
         }
 
     def can_fetch(self, url: str) -> RobotsResult:
@@ -210,9 +284,17 @@ class RobotsChecker:
         result = self.can_fetch(url)
         return result.crawl_delay or self.default_delay
 
-    def get_headers(self) -> dict[str, str]:
-        """Get headers to use for requests."""
-        return self._get_headers()
+    def get_headers(self, url: Optional[str] = None) -> dict[str, str]:
+        """
+        Get headers to use for requests.
+
+        Args:
+            url: Target URL (used to determine domain-specific headers)
+
+        Returns:
+            Dictionary of HTTP headers
+        """
+        return self._get_headers(url)
 
     def clear_cache(self) -> None:
         """Clear the robots.txt cache."""

@@ -293,7 +293,18 @@ class ThrottledSession:
     Wrapper for requests that enforces rate limiting.
 
     Combines rate limiting, robots.txt compliance, and retry logic.
+    Uses cloudscraper for domains with Cloudflare protection.
     """
+
+    # Domains that use Cloudflare or similar protection
+    CLOUDFLARE_DOMAINS = {
+        "investor.workday.com",
+        "newsroom.workday.com",
+        "blog.workday.com",
+        "www.workday.com",
+        "seekingalpha.com",
+        "www.fool.com",
+    }
 
     def __init__(
         self,
@@ -313,10 +324,31 @@ class ThrottledSession:
         self.max_retries = max_retries
         self.session = requests.Session()
 
+        # Create cloudscraper session for protected domains
+        try:
+            import cloudscraper
+
+            self.cloudscraper_session = cloudscraper.create_scraper(
+                browser={"browser": "chrome", "platform": "darwin", "mobile": False}
+            )
+            self._has_cloudscraper = True
+            logger.debug("Cloudscraper available for Cloudflare-protected domains")
+        except ImportError:
+            self.cloudscraper_session = None
+            self._has_cloudscraper = False
+            logger.warning("Cloudscraper not installed; some sites may block requests")
+
         # Import here to avoid circular imports
         from ingest.robots import get_robots_checker
 
         self.robots_checker = get_robots_checker()
+
+    def _get_session_for_url(self, url: str):
+        """Get appropriate session for the URL's domain."""
+        domain = urlparse(url).netloc.lower()
+        if self._has_cloudscraper and domain in self.CLOUDFLARE_DOMAINS:
+            return self.cloudscraper_session
+        return self.session
 
     def get(self, url: str, **kwargs) -> "requests.Response":
         """
@@ -345,17 +377,20 @@ class ThrottledSession:
             domain = urlparse(url).netloc.lower()
             self.rate_limiter.domain_rates[domain] = 1.0 / robots_result.crawl_delay
 
-        # Set headers
+        # Set headers (domain-specific for bot protection)
         if "headers" not in kwargs:
             kwargs["headers"] = {}
-        kwargs["headers"].update(self.robots_checker.get_headers())
+        kwargs["headers"].update(self.robots_checker.get_headers(url))
+
+        # Select appropriate session (cloudscraper for protected domains)
+        session = self._get_session_for_url(url)
 
         def do_request():
             # Wait for rate limit
             self.rate_limiter.wait_if_needed(url)
 
             # Make request
-            response = self.session.get(url, **kwargs)
+            response = session.get(url, **kwargs)
 
             # Handle rate limit responses
             if response.status_code == 429:
