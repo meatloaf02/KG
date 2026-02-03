@@ -1,5 +1,32 @@
 # Knowledge graph schema and operations module
 
+from kg.connection import (
+    # Connection management
+    get_memgraph,
+    close_connection,
+    memgraph_session,
+    check_connection,
+    # Query execution
+    execute_query,
+    execute_query_with_retry,
+    execute_write,
+    execute_many,
+    # Utilities
+    get_node_count,
+    get_relationship_count,
+    get_database_stats,
+    clear_database,
+    # Exceptions
+    MemgraphConnectionError,
+    MemgraphQueryError,
+)
+
+from kg.init import (
+    init_schema,
+    load_seed_data,
+    show_status,
+)
+
 from kg.schema import (
     # Node labels
     NODE_DOCUMENT,
@@ -55,6 +82,28 @@ from kg.schema import (
 )
 
 __all__ = [
+    # Connection management
+    "get_memgraph",
+    "close_connection",
+    "memgraph_session",
+    "check_connection",
+    # Query execution
+    "execute_query",
+    "execute_query_with_retry",
+    "execute_write",
+    "execute_many",
+    # Connection utilities
+    "get_node_count",
+    "get_relationship_count",
+    "get_database_stats",
+    "clear_database",
+    # Exceptions
+    "MemgraphConnectionError",
+    "MemgraphQueryError",
+    # Schema initialization
+    "init_schema",
+    "load_seed_data",
+    "show_status",
     # Node labels
     "NODE_DOCUMENT",
     "NODE_COMPANY",

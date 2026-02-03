@@ -1,0 +1,54 @@
+version: "3.8"
+
+services:
+  # Memgraph - Graph Database for Knowledge Graph
+  memgraph:
+    image: memgraph/memgraph-platform:latest
+    container_name: workday-kg-memgraph
+    ports:
+      - "7687:7687"   # Bolt protocol (for gqlalchemy/neo4j drivers)
+      - "7444:7444"   # Memgraph Lab web UI
+      - "3000:3000"   # Memgraph Lab (alternative port)
+    volumes:
+      - memgraph_data:/var/lib/memgraph
+      - memgraph_log:/var/log/memgraph
+      - ./kg/schema.cypher:/usr/share/memgraph/init.cypher:ro
+    environment:
+      - MEMGRAPH_USER=
+      - MEMGRAPH_PASSWORD=
+    command: ["--log-level=WARNING"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "echo", ">", "/dev/tcp/localhost/7687"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # PostgreSQL - Raw Document Metadata (already exists locally, optional here)
+  postgres:
+    image: postgres:14-alpine
+    container_name: workday-kg-postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: workday_kg
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    profiles:
+      - full  # Only start with --profile full
+
+volumes:
+  memgraph_data:
+    name: workday-kg-memgraph-data
+  memgraph_log:
+    name: workday-kg-memgraph-log
+  postgres_data:
+    name: workday-kg-postgres-data
