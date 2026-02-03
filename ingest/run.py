@@ -172,6 +172,109 @@ def show_seed_files() -> None:
         print(f"  {name}: {count} URLs")
 
 
+def extract_links_cmd(dry_run: bool = False) -> None:
+    """Extract links from fetched documents and add to queue."""
+    from ingest.extractor import add_links_to_queue, extract_all_links
+
+    print("Extracting links from fetched documents...")
+    links = extract_all_links()
+
+    if not links:
+        print("No links extracted. Fetch some documents first.")
+        return
+
+    # Show summary by source type
+    by_type = {}
+    for link in links:
+        by_type[link.source_type] = by_type.get(link.source_type, 0) + 1
+
+    print(f"\nExtracted {len(links)} links:")
+    for source_type, count in sorted(by_type.items(), key=lambda x: -x[1]):
+        print(f"  {source_type}: {count}")
+
+    if dry_run:
+        print("\n--- DRY RUN MODE ---")
+        print("Links would be added to ingestion queue.")
+        return
+
+    # Add to queue
+    stats = add_links_to_queue(links)
+    print(f"\nQueue update:")
+    print(f"  Added: {stats['added']}")
+    print(f"  Already exists: {stats['existing']}")
+    print(f"  Duplicates skipped: {stats['skipped']}")
+
+
+def crawl_cmd(
+    limit: Optional[int] = None,
+    dry_run: bool = False,
+    force: bool = False,
+) -> None:
+    """Extract links and fetch discovered documents."""
+    from ingest.extractor import add_links_to_queue, extract_all_links
+    from ingest.fetcher import get_fetcher
+    from ingest.models import FetchStatus, RawDocument, get_session
+
+    # First extract links
+    print("Step 1: Extracting links from fetched documents...")
+    links = extract_all_links()
+
+    if not links:
+        print("No links to crawl. Fetch seed documents first.")
+        return
+
+    print(f"Extracted {len(links)} links")
+
+    if not dry_run:
+        # Add to queue
+        stats = add_links_to_queue(links)
+        print(f"Added {stats['added']} new URLs to queue")
+
+    # Now fetch pending documents
+    print("\nStep 2: Fetching discovered documents...")
+
+    db_session = get_session()
+    try:
+        query = db_session.query(RawDocument).filter(
+            RawDocument.status == FetchStatus.PENDING
+        )
+        if limit:
+            query = query.limit(limit)
+
+        pending_docs = query.all()
+        urls = [(doc.url, doc.source_type or "unknown") for doc in pending_docs]
+    finally:
+        db_session.close()
+
+    if not urls:
+        print("No pending documents to fetch.")
+        return
+
+    print(f"Found {len(urls)} pending documents")
+
+    if dry_run:
+        print("\n--- DRY RUN MODE ---")
+        for i, (url, source_type) in enumerate(urls[:10]):
+            print(f"  [{i + 1}] {url}")
+        if len(urls) > 10:
+            print(f"  ... and {len(urls) - 10} more")
+        return
+
+    # Fetch documents
+    fetcher = get_fetcher()
+    results = fetcher.fetch_many(urls, skip_if_exists=not force, limit=limit)
+
+    # Print summary
+    success = sum(1 for r in results if r.status == FetchStatus.SUCCESS)
+    skipped = sum(1 for r in results if r.status == FetchStatus.SKIPPED)
+    failed = sum(1 for r in results if r.status == FetchStatus.FAILED)
+
+    print(f"\nCrawl Results:")
+    print(f"  Success: {success}")
+    print(f"  Skipped: {skipped}")
+    print(f"  Failed: {failed}")
+
+
 def main():
     """Main CLI entrypoint."""
     parser = argparse.ArgumentParser(
@@ -202,6 +305,12 @@ Examples:
 
   # Export manifest
   python -m ingest.run --export-manifest
+
+  # Extract links from fetched documents
+  python -m ingest.run --extract
+
+  # Crawl: extract links and fetch discovered documents
+  python -m ingest.run --crawl --limit 50
         """,
     )
 
@@ -265,6 +374,18 @@ Examples:
         help="Re-fetch even if URL was already fetched successfully",
     )
 
+    # Link extraction and crawling
+    parser.add_argument(
+        "--extract",
+        action="store_true",
+        help="Extract links from fetched documents and add to queue",
+    )
+    parser.add_argument(
+        "--crawl",
+        action="store_true",
+        help="Extract links and fetch discovered documents",
+    )
+
     # Export and stats
     parser.add_argument(
         "--export-manifest",
@@ -322,6 +443,16 @@ Examples:
         # Export manifest
         if args.export_manifest:
             export_manifest_cmd(output=args.output)
+            return
+
+        # Extract links
+        if args.extract:
+            extract_links_cmd(dry_run=args.dry_run)
+            return
+
+        # Crawl (extract + fetch)
+        if args.crawl:
+            crawl_cmd(limit=args.limit, dry_run=args.dry_run, force=args.force)
             return
 
         # Fetch from seeds
