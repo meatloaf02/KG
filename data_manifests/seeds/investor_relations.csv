@@ -1,5 +1,3 @@
 url,source_type,content_type,priority,notes
 https://investor.workday.com/,investor_relations,landing_page,high,Workday IR main page
 https://investor.workday.com/sec-filings,investor_relations,sec_filings,high,IR SEC filings page
-https://investor.workday.com/stock-information,investor_relations,stock_info,medium,Stock information page
-https://investor.workday.com/corporate-governance,investor_relations,governance,medium,Corporate governance documents
