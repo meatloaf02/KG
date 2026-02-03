@@ -21,7 +21,7 @@ Relationship Types:
 """
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 
@@ -375,7 +375,7 @@ class Evidence:
             "start_char": self.start_char,
             "end_char": self.end_char,
             "confidence": self.confidence,
-            "extracted_at": (self.extracted_at or datetime.utcnow()).isoformat(),
+            "extracted_at": (self.extracted_at or datetime.now(timezone.utc)).isoformat(),
             "extractor_version": self.extractor_version,
         }
 

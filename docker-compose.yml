@@ -6,9 +6,9 @@ services:
     image: memgraph/memgraph-platform:latest
     container_name: workday-kg-memgraph
     ports:
-      - "7687:7687"   # Bolt protocol (for gqlalchemy/neo4j drivers)
-      - "7444:7444"   # Memgraph Lab web UI
-      - "3000:3000"   # Memgraph Lab (alternative port)
+      - "7688:7687"   # Bolt protocol (mapped to 7688 to avoid conflicts)
+      - "7445:7444"   # Memgraph Lab web UI (mapped to 7445)
+      - "3001:3000"   # Memgraph Lab (mapped to 3001)
     volumes:
       - memgraph_data:/var/lib/memgraph
       - memgraph_log:/var/log/memgraph

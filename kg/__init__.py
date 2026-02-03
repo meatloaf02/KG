@@ -27,6 +27,12 @@ from kg.init import (
     show_status,
 )
 
+from kg.loaders import (
+    KGLoader,
+    LoadResult,
+    BatchLoadResult,
+)
+
 from kg.schema import (
     # Node labels
     NODE_DOCUMENT,
@@ -104,6 +110,10 @@ __all__ = [
     "init_schema",
     "load_seed_data",
     "show_status",
+    # Loaders
+    "KGLoader",
+    "LoadResult",
+    "BatchLoadResult",
     # Node labels
     "NODE_DOCUMENT",
     "NODE_COMPANY",
