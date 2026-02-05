@@ -14,6 +14,11 @@ from measures.lexicons import (
     get_all_lexicons,
     get_entity_ids_by_type,
 )
+from measures.quarterly import (
+    QuarterlyMetrics,
+    QuarterlySignals,
+    compute_quarterly_signals,
+)
 
 __all__ = [
     # Extractor
@@ -28,4 +33,8 @@ __all__ = [
     "EntityMatch",
     "get_all_lexicons",
     "get_entity_ids_by_type",
+    # Quarterly Signals
+    "QuarterlyMetrics",
+    "QuarterlySignals",
+    "compute_quarterly_signals",
 ]
