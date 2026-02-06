@@ -210,6 +210,106 @@ class DateExtractor:
 
         return None
 
+    def extract_from_sec_filename(self, url: str) -> Optional[DateExtractionResult]:
+        """
+        Extract date from SEC filename patterns specific to Workday filings.
+
+        Handles patterns like:
+        - wd-YYYYMMDD (e.g., wd-20250131.htm) → 2025-01-31
+        - wday-MMDDYYYY (e.g., wday-01312015x10k.htm) → 2015-01-31
+        - wday-MDDYYYY (e.g., wday-1312017x8k.htm) → 2017-01-31
+        - wday-MMDDYY (e.g., wday-062222x991.htm) → 2022-06-22
+        """
+        if not url:
+            return None
+
+        # Extract filename from URL
+        filename = url.split("/")[-1].lower() if "/" in url else url.lower()
+
+        # Pattern 1: wd-YYYYMMDD (8 digits, year first)
+        match = re.search(r"wd-(\d{4})(\d{2})(\d{2})", filename)
+        if match:
+            try:
+                date = datetime(
+                    int(match.group(1)),
+                    int(match.group(2)),
+                    int(match.group(3)),
+                )
+                if 2000 <= date.year <= 2030:
+                    return DateExtractionResult(
+                        date=date,
+                        date_str=date.strftime("%Y-%m-%d"),
+                        source="sec_filename",
+                        confidence=0.85,
+                        raw_match=match.group(0),
+                    )
+            except ValueError:
+                pass
+
+        # Pattern 2: wday-MMDDYYYY (8 digits, month first)
+        match = re.search(r"wday-(\d{2})(\d{2})(\d{4})", filename)
+        if match:
+            try:
+                date = datetime(
+                    int(match.group(3)),  # year
+                    int(match.group(1)),  # month
+                    int(match.group(2)),  # day
+                )
+                if 2000 <= date.year <= 2030:
+                    return DateExtractionResult(
+                        date=date,
+                        date_str=date.strftime("%Y-%m-%d"),
+                        source="sec_filename",
+                        confidence=0.85,
+                        raw_match=match.group(0),
+                    )
+            except ValueError:
+                pass
+
+        # Pattern 3: wday-MDDYYYY (7 digits, single-digit month)
+        match = re.search(r"wday-(\d)(\d{2})(\d{4})", filename)
+        if match:
+            try:
+                date = datetime(
+                    int(match.group(3)),  # year
+                    int(match.group(1)),  # month (single digit)
+                    int(match.group(2)),  # day
+                )
+                if 2000 <= date.year <= 2030:
+                    return DateExtractionResult(
+                        date=date,
+                        date_str=date.strftime("%Y-%m-%d"),
+                        source="sec_filename",
+                        confidence=0.85,
+                        raw_match=match.group(0),
+                    )
+            except ValueError:
+                pass
+
+        # Pattern 4: wday-MMDDYY (6 digits, 2-digit year)
+        match = re.search(r"wday-(\d{2})(\d{2})(\d{2})", filename)
+        if match:
+            try:
+                year_suffix = int(match.group(3))
+                year = 2000 + year_suffix if year_suffix < 50 else 1900 + year_suffix
+                date = datetime(
+                    year,
+                    int(match.group(1)),  # month
+                    int(match.group(2)),  # day
+                )
+                if 2000 <= date.year <= 2030:
+                    return DateExtractionResult(
+                        date=date,
+                        date_str=date.strftime("%Y-%m-%d"),
+                        source="sec_filename",
+                        confidence=0.85,
+                        raw_match=match.group(0),
+                    )
+            except ValueError:
+                pass
+
+        return None
+
     def extract_from_filename(self, filename: str) -> Optional[DateExtractionResult]:
         """
         Extract date from filename patterns.
@@ -283,6 +383,11 @@ class DateExtractor:
 
         if url:
             result = self.extract_from_url(url)
+            if result:
+                results.append(result)
+
+            # Also try SEC filename patterns from URL
+            result = self.extract_from_sec_filename(url)
             if result:
                 results.append(result)
 

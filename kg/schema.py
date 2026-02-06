@@ -141,6 +141,9 @@ ON CREATE SET
     d.source_url = $source_url,
     d.created_at = timestamp()
 ON MATCH SET
+    d.title = $title,
+    d.doc_type = $doc_type,
+    d.publish_date = $publish_date,
     d.updated_at = timestamp()
 RETURN d
 """

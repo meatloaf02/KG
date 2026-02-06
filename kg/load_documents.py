@@ -18,6 +18,7 @@ from config import setup_logging
 from ingest.models import FetchStatus, RawDocument, get_session
 from kg.loaders import KGLoader
 from kg.schema import DocumentNode
+from process.storage import ProcessedDocumentStorage
 
 logger = setup_logging(__name__)
 
@@ -44,31 +45,50 @@ def get_documents_to_load(limit: int = None) -> list[RawDocument]:
         return query.all()
 
 
-def raw_to_document_node(raw: RawDocument) -> DocumentNode:
+def raw_to_document_node(
+    raw: RawDocument,
+    processed_storage: ProcessedDocumentStorage | None = None,
+) -> DocumentNode:
     """
     Convert a RawDocument (PostgreSQL) to a DocumentNode (Memgraph).
 
+    Uses processed document data when available for accurate dates,
+    titles, and doc_types. Never falls back to fetched_at - a null
+    date is better than a wrong date.
+
     Args:
         raw: RawDocument from PostgreSQL
+        processed_storage: Optional storage to look up processed document data
 
     Returns:
         DocumentNode for Memgraph
     """
-    # Determine doc_type from content_type or URL
+    # Default values from raw document
     doc_type = "html"
     if raw.content_type:
         if "pdf" in raw.content_type.lower():
             doc_type = "pdf"
 
-    # Extract publish date if available (from SEC filing date, etc.)
-    publish_date = None
-    if raw.fetched_at:
-        publish_date = raw.fetched_at.strftime("%Y-%m-%d")
+    title = raw.title or raw.url[:100]
+    publish_date = None  # Never use fetched_at - null is better than wrong
+
+    # Try to get better data from processed document
+    if processed_storage and raw.content_hash:
+        processed = processed_storage.load(raw.content_hash)
+        if processed:
+            # Use processed document's extracted date (not fetched_at)
+            publish_date = processed.publish_date
+            # Use processed document's classification
+            if processed.doc_type:
+                doc_type = processed.doc_type
+            # Use processed document's title if available
+            if processed.title:
+                title = processed.title
 
     return DocumentNode(
         content_hash=raw.content_hash,
         url_hash=raw.url_hash,
-        title=raw.title or raw.url[:100],
+        title=title,
         doc_type=doc_type,
         source_type=raw.source_type or "unknown",
         publish_date=publish_date,
@@ -110,9 +130,10 @@ def load_all_documents(
             print(f"  ... and {total - 10} more")
         return {"total": total, "loaded": 0, "dry_run": True}
 
-    # Convert to DocumentNode objects
+    # Convert to DocumentNode objects (using processed document data for dates)
     print("\nConverting to DocumentNode objects...")
-    documents = [raw_to_document_node(raw) for raw in raw_docs]
+    processed_storage = ProcessedDocumentStorage()
+    documents = [raw_to_document_node(raw, processed_storage) for raw in raw_docs]
 
     # Load into Memgraph
     print(f"\nLoading {total} documents into Memgraph...")

@@ -108,10 +108,23 @@ class DocumentProcessor:
             logger.warning(f"No text extracted from {content_hash[:16]}")
             warnings.append("No text extracted")
 
+        # Read raw HTML for date extraction (non-PDF only)
+        raw_html = None
+        if not is_pdf and file_path and file_path.exists():
+            try:
+                with open(file_path, "r", encoding="utf-8") as f:
+                    raw_html = f.read()
+            except Exception:
+                try:
+                    with open(file_path, "r", encoding="latin-1") as f:
+                        raw_html = f.read()
+                except Exception:
+                    pass
+
         # Extract publish date
         date_result = self.date_extractor.extract(
             url=raw_doc.url,
-            html=None,  # Don't re-read file
+            html=raw_html,
             text=text[:2000] if text else None,
             filename=file_path.name if file_path else None,
         )
