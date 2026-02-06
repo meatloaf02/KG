@@ -173,6 +173,10 @@ def get_documents_by_quarter(driver=None) -> dict[tuple[int, int], list[dict]]:
     """
     Get all documents grouped by quarter.
 
+    Uses the native published_at Date field for quarter extraction.
+    Falls back to Python-side parsing of publish_date for nodes
+    that haven't been migrated yet.
+
     Args:
         driver: Optional Memgraph driver
 
@@ -181,18 +185,33 @@ def get_documents_by_quarter(driver=None) -> dict[tuple[int, int], list[dict]]:
     """
     query = """
     MATCH (d:Document)
-    WHERE d.publish_date IS NOT NULL
+    WHERE d.published_at IS NOT NULL
     RETURN d.content_hash AS content_hash,
-           d.publish_date AS publish_date,
+           d.published_at.year AS year,
+           d.published_at.quarter AS quarter,
            d.source_type AS source_type,
            d.title AS title
-    ORDER BY d.publish_date
+    ORDER BY d.published_at
     """
 
     results = execute_query(query, driver=driver)
     quarters = defaultdict(list)
 
     for record in results:
+        key = (record["year"], record["quarter"])
+        quarters[key].append(record)
+
+    # Fallback: pick up any nodes with publish_date but no published_at
+    fallback_query = """
+    MATCH (d:Document)
+    WHERE d.publish_date IS NOT NULL AND d.published_at IS NULL
+    RETURN d.content_hash AS content_hash,
+           d.publish_date AS publish_date,
+           d.source_type AS source_type,
+           d.title AS title
+    """
+    fallback_results = execute_query(fallback_query, driver=driver)
+    for record in fallback_results:
         parsed = parse_quarter_from_date(record.get("publish_date"))
         if parsed:
             quarters[parsed].append(record)
@@ -204,6 +223,9 @@ def get_mentions_by_quarter(driver=None) -> dict[tuple[int, int], dict[str, list
     """
     Get all entity mentions grouped by quarter.
 
+    Uses the native published_at Date field for quarter extraction.
+    Falls back to Python-side parsing for unmigrated nodes.
+
     Args:
         driver: Optional Memgraph driver
 
@@ -213,8 +235,9 @@ def get_mentions_by_quarter(driver=None) -> dict[tuple[int, int], dict[str, list
     # Query for capability mentions
     cap_query = """
     MATCH (d:Document)-[r:MENTIONS]->(c:Capability)
-    WHERE d.publish_date IS NOT NULL
-    RETURN d.publish_date AS publish_date,
+    WHERE d.published_at IS NOT NULL
+    RETURN d.published_at.year AS year,
+           d.published_at.quarter AS quarter,
            d.content_hash AS doc_hash,
            c.id AS entity_id,
            c.name AS entity_name,
@@ -224,8 +247,9 @@ def get_mentions_by_quarter(driver=None) -> dict[tuple[int, int], dict[str, list
     # Query for product mentions
     prod_query = """
     MATCH (d:Document)-[r:MENTIONS]->(p:Product)
-    WHERE d.publish_date IS NOT NULL
-    RETURN d.publish_date AS publish_date,
+    WHERE d.published_at IS NOT NULL
+    RETURN d.published_at.year AS year,
+           d.published_at.quarter AS quarter,
            d.content_hash AS doc_hash,
            p.id AS entity_id,
            p.name AS entity_name,
@@ -235,7 +259,39 @@ def get_mentions_by_quarter(driver=None) -> dict[tuple[int, int], dict[str, list
     # Query for risk disclosures
     risk_query = """
     MATCH (d:Document)-[r:DISCLOSES]->(rt:RiskTopic)
-    WHERE d.publish_date IS NOT NULL
+    WHERE d.published_at IS NOT NULL
+    RETURN d.published_at.year AS year,
+           d.published_at.quarter AS quarter,
+           d.content_hash AS doc_hash,
+           rt.id AS entity_id,
+           rt.name AS entity_name,
+           'risk' AS entity_type
+    """
+
+    # Fallback queries for unmigrated nodes
+    cap_fallback = """
+    MATCH (d:Document)-[r:MENTIONS]->(c:Capability)
+    WHERE d.publish_date IS NOT NULL AND d.published_at IS NULL
+    RETURN d.publish_date AS publish_date,
+           d.content_hash AS doc_hash,
+           c.id AS entity_id,
+           c.name AS entity_name,
+           'capability' AS entity_type
+    """
+
+    prod_fallback = """
+    MATCH (d:Document)-[r:MENTIONS]->(p:Product)
+    WHERE d.publish_date IS NOT NULL AND d.published_at IS NULL
+    RETURN d.publish_date AS publish_date,
+           d.content_hash AS doc_hash,
+           p.id AS entity_id,
+           p.name AS entity_name,
+           'product' AS entity_type
+    """
+
+    risk_fallback = """
+    MATCH (d:Document)-[r:DISCLOSES]->(rt:RiskTopic)
+    WHERE d.publish_date IS NOT NULL AND d.published_at IS NULL
     RETURN d.publish_date AS publish_date,
            d.content_hash AS doc_hash,
            rt.id AS entity_id,
@@ -245,11 +301,22 @@ def get_mentions_by_quarter(driver=None) -> dict[tuple[int, int], dict[str, list
 
     quarters = defaultdict(lambda: {"capabilities": [], "products": [], "risks": []})
 
-    # Execute queries
+    # Execute native Date queries
     for query, entity_key in [
         (cap_query, "capabilities"),
         (prod_query, "products"),
         (risk_query, "risks"),
+    ]:
+        results = execute_query(query, driver=driver)
+        for record in results:
+            key = (record["year"], record["quarter"])
+            quarters[key][entity_key].append(record)
+
+    # Execute fallback queries for unmigrated nodes
+    for query, entity_key in [
+        (cap_fallback, "capabilities"),
+        (prod_fallback, "products"),
+        (risk_fallback, "risks"),
     ]:
         results = execute_query(query, driver=driver)
         for record in results:

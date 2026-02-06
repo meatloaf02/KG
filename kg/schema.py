@@ -91,6 +91,7 @@ INDEX_QUERIES = [
     "CREATE INDEX ON :Document(content_hash);",
     "CREATE INDEX ON :Document(url_hash);",
     "CREATE INDEX ON :Document(publish_date);",
+    "CREATE INDEX ON :Document(published_at);",
     "CREATE INDEX ON :Document(doc_type);",
     "CREATE INDEX ON :Document(source_type);",
     # Company indexes
@@ -138,12 +139,14 @@ ON CREATE SET
     d.doc_type = $doc_type,
     d.source_type = $source_type,
     d.publish_date = $publish_date,
+    d.published_at = CASE WHEN $publish_date IS NOT NULL THEN date($publish_date) ELSE NULL END,
     d.source_url = $source_url,
     d.created_at = timestamp()
 ON MATCH SET
     d.title = $title,
     d.doc_type = $doc_type,
     d.publish_date = $publish_date,
+    d.published_at = CASE WHEN $publish_date IS NOT NULL THEN date($publish_date) ELSE NULL END,
     d.updated_at = timestamp()
 RETURN d
 """
@@ -337,11 +340,11 @@ ORDER BY d.publish_date DESC
 # Count mentions by quarter
 COUNT_MENTIONS_BY_QUARTER = """
 MATCH (d:Document)-[:MENTIONS]->(cap:Capability)
-WHERE d.publish_date IS NOT NULL
+WHERE d.published_at IS NOT NULL
 RETURN
     cap.name as capability,
-    d.publish_date.year as year,
-    (d.publish_date.month - 1) / 3 + 1 as quarter,
+    d.published_at.year as year,
+    d.published_at.quarter as quarter,
     count(*) as mention_count
 ORDER BY year, quarter, capability
 """
