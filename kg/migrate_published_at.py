@@ -38,7 +38,7 @@ WHERE d.published_at IS NOT NULL
 RETURN d.publish_date AS publish_date,
        d.published_at AS published_at,
        d.published_at.year AS year,
-       d.published_at.quarter AS quarter
+       (d.published_at.month - 1) / 3 + 1 AS quarter
 LIMIT 5
 """
 

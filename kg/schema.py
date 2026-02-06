@@ -344,7 +344,7 @@ WHERE d.published_at IS NOT NULL
 RETURN
     cap.name as capability,
     d.published_at.year as year,
-    d.published_at.quarter as quarter,
+    (d.published_at.month - 1) / 3 + 1 as quarter,
     count(*) as mention_count
 ORDER BY year, quarter, capability
 """

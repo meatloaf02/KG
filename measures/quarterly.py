@@ -188,7 +188,7 @@ def get_documents_by_quarter(driver=None) -> dict[tuple[int, int], list[dict]]:
     WHERE d.published_at IS NOT NULL
     RETURN d.content_hash AS content_hash,
            d.published_at.year AS year,
-           d.published_at.quarter AS quarter,
+           (d.published_at.month - 1) / 3 + 1 AS quarter,
            d.source_type AS source_type,
            d.title AS title
     ORDER BY d.published_at
@@ -237,7 +237,7 @@ def get_mentions_by_quarter(driver=None) -> dict[tuple[int, int], dict[str, list
     MATCH (d:Document)-[r:MENTIONS]->(c:Capability)
     WHERE d.published_at IS NOT NULL
     RETURN d.published_at.year AS year,
-           d.published_at.quarter AS quarter,
+           (d.published_at.month - 1) / 3 + 1 AS quarter,
            d.content_hash AS doc_hash,
            c.id AS entity_id,
            c.name AS entity_name,
@@ -249,7 +249,7 @@ def get_mentions_by_quarter(driver=None) -> dict[tuple[int, int], dict[str, list
     MATCH (d:Document)-[r:MENTIONS]->(p:Product)
     WHERE d.published_at IS NOT NULL
     RETURN d.published_at.year AS year,
-           d.published_at.quarter AS quarter,
+           (d.published_at.month - 1) / 3 + 1 AS quarter,
            d.content_hash AS doc_hash,
            p.id AS entity_id,
            p.name AS entity_name,
@@ -261,7 +261,7 @@ def get_mentions_by_quarter(driver=None) -> dict[tuple[int, int], dict[str, list
     MATCH (d:Document)-[r:DISCLOSES]->(rt:RiskTopic)
     WHERE d.published_at IS NOT NULL
     RETURN d.published_at.year AS year,
-           d.published_at.quarter AS quarter,
+           (d.published_at.month - 1) / 3 + 1 AS quarter,
            d.content_hash AS doc_hash,
            rt.id AS entity_id,
            rt.name AS entity_name,
