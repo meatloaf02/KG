@@ -59,12 +59,15 @@ URL_PATTERNS = {
     # SEC filings
     DocType.SEC_10K: [
         r"/10-K", r"/10K", r"form10k", r"10-k\.htm",
+        r"x10k\.htm", r"\d+d10k\.htm",
     ],
     DocType.SEC_10Q: [
         r"/10-Q", r"/10Q", r"form10q", r"10-q\.htm",
+        r"x10q\.htm", r"\d+d10q\.htm",
     ],
     DocType.SEC_8K: [
         r"/8-K", r"/8K", r"form8k", r"8-k\.htm",
+        r"d\w+d8k\.htm",
     ],
     DocType.SEC_DEF14A: [
         r"def14a", r"proxy", r"DEF\s*14A",
@@ -209,13 +212,28 @@ class DocumentClassifier:
         best_type = max(scores, key=scores.get)
         best_score = scores[best_type]
 
+        # Promote specific SEC filings over generic sec_other.
+        # When sec_other wins (from broad EDGAR URL + source_type) but a
+        # specific filing type (8-K, 10-Q, 10-K) also has signal, prefer it.
+        if best_type == DocType.SEC_OTHER:
+            specific_sec_types = [
+                DocType.SEC_10K, DocType.SEC_10Q,
+                DocType.SEC_8K, DocType.SEC_DEF14A,
+            ]
+            for stype in specific_sec_types:
+                if scores[stype] > 0:
+                    best_type = stype
+                    best_score = max(best_score, scores[stype])
+                    signals.append(f"promoted: {stype.value} over sec_other")
+                    break
+
         # If no strong signal, default to unknown
         if best_score < 0.2:
             best_type = DocType.UNKNOWN
             best_score = 0.0
 
         # Determine sub-type
-        sub_type = self._get_sub_type(best_type, title, text)
+        sub_type = self._get_sub_type(best_type, title, text, url)
 
         # Normalize confidence
         confidence = min(best_score, 1.0)
@@ -281,6 +299,7 @@ class DocumentClassifier:
         doc_type: DocType,
         title: Optional[str],
         text: Optional[str],
+        url: Optional[str] = None,
     ) -> Optional[str]:
         """Determine sub-type for certain document types."""
         if doc_type == DocType.SEC_10K:
@@ -309,7 +328,61 @@ class DocumentClassifier:
                     return f"Q{quarter_match.group(1)} {quarter_match.group(2)} Earnings Call"
             return "Earnings Call Transcript"
 
+        if doc_type == DocType.SEC_OTHER:
+            return self._get_sec_other_subtype(url, text)
+
         return None
+
+    def _get_sec_other_subtype(
+        self,
+        url: Optional[str],
+        text: Optional[str],
+    ) -> str:
+        """Determine sub-type for sec_other documents.
+
+        Uses URL-first logic (highest signal) with content-based fallbacks.
+        Returns a controlled vocabulary string.
+        """
+        url_lower = (url or "").lower()
+
+        # 1. EDGAR index pages
+        if "-index.htm" in url_lower:
+            return "index_page"
+
+        # 2. Exhibit detection by URL pattern (ex + number)
+        exhibit_match = re.search(r"ex(\d{2,3})", url_lower)
+        if exhibit_match:
+            exhibit_num = exhibit_match.group(1)
+            # SOX certifications: EX-31.x, EX-32.x
+            if exhibit_num.startswith("31") or exhibit_num.startswith("32"):
+                return "exhibit_certification"
+            # Press releases: EX-99.x
+            if exhibit_num.startswith("99"):
+                return "exhibit_press_release"
+            # Agreements/contracts: EX-10.x
+            if exhibit_num.startswith("10"):
+                return "exhibit_agreement"
+            # Consent of auditors: EX-23.x
+            if exhibit_num.startswith("23"):
+                return "exhibit_consent"
+            # Subsidiaries list: EX-21.x
+            if exhibit_num.startswith("21"):
+                return "exhibit_subsidiaries"
+            # Any other exhibit
+            return "exhibit_other"
+
+        # 3. Content-based fallbacks (first 5000 chars)
+        if text:
+            content = text[:5000].lower()
+            # SOX certification language
+            if "certif" in content and "sarbanes" in content:
+                return "exhibit_certification"
+            # Press release language
+            if "forward-looking statements" in content:
+                return "exhibit_press_release"
+
+        # 4. Default for remaining sec_other
+        return "filing_document"
 
     def _extract_8k_items(self, text: str) -> list[str]:
         """Extract 8-K item numbers from text."""

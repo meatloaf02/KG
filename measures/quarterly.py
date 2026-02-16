@@ -38,6 +38,11 @@ class QuarterlyMetrics:
     # Document counts
     document_count: int = 0
     sec_filing_count: int = 0
+    sec_10k_count: int = 0
+    sec_10q_count: int = 0
+    sec_8k_count: int = 0
+    sec_def14a_count: int = 0
+    sec_other_count: int = 0
     press_release_count: int = 0
     blog_count: int = 0
     other_count: int = 0
@@ -46,16 +51,19 @@ class QuarterlyMetrics:
     capability_mention_count: int = 0
     product_mention_count: int = 0
     risk_mention_count: int = 0
+    event_mention_count: int = 0
 
     # Unique entity counts
     unique_capabilities: int = 0
     unique_products: int = 0
     unique_risks: int = 0
+    unique_events: int = 0
 
     # Entity breakdown
     capability_breakdown: dict = field(default_factory=dict)
     product_breakdown: dict = field(default_factory=dict)
     risk_breakdown: dict = field(default_factory=dict)
+    event_breakdown: dict = field(default_factory=dict)
 
     @property
     def period(self) -> str:
@@ -83,6 +91,13 @@ class QuarterlyMetrics:
             return 0.0
         return round(self.risk_mention_count / self.document_count, 4)
 
+    @property
+    def event_density(self) -> float:
+        """Event density = event mentions per document."""
+        if self.document_count == 0:
+            return 0.0
+        return round(self.event_mention_count / self.document_count, 4)
+
     def to_dict(self) -> dict:
         """Convert to dictionary for serialization."""
         return {
@@ -91,18 +106,26 @@ class QuarterlyMetrics:
             "quarter": self.quarter,
             "document_count": self.document_count,
             "sec_filing_count": self.sec_filing_count,
+            "sec_10k_count": self.sec_10k_count,
+            "sec_10q_count": self.sec_10q_count,
+            "sec_8k_count": self.sec_8k_count,
+            "sec_def14a_count": self.sec_def14a_count,
+            "sec_other_count": self.sec_other_count,
             "press_release_count": self.press_release_count,
             "blog_count": self.blog_count,
             "other_count": self.other_count,
             "capability_mention_count": self.capability_mention_count,
             "product_mention_count": self.product_mention_count,
             "risk_mention_count": self.risk_mention_count,
+            "event_mention_count": self.event_mention_count,
             "unique_capabilities": self.unique_capabilities,
             "unique_products": self.unique_products,
             "unique_risks": self.unique_risks,
+            "unique_events": self.unique_events,
             "ai_intensity": self.ai_intensity,
             "product_coverage": self.product_coverage,
             "risk_density": self.risk_density,
+            "event_density": self.event_density,
         }
 
 
@@ -116,6 +139,7 @@ class QuarterlySignals:
     total_capabilities: int = 0
     total_products: int = 0
     total_risks: int = 0
+    total_events: int = 0
 
     def to_csv(self, output_path: Path) -> Path:
         """Export to CSV file."""
@@ -189,6 +213,7 @@ def get_documents_by_quarter(driver=None) -> dict[tuple[int, int], list[dict]]:
     RETURN d.content_hash AS content_hash,
            d.published_at.year AS year,
            (d.published_at.month - 1) / 3 + 1 AS quarter,
+           d.doc_type AS doc_type,
            d.source_type AS source_type,
            d.title AS title
     ORDER BY d.published_at
@@ -207,6 +232,7 @@ def get_documents_by_quarter(driver=None) -> dict[tuple[int, int], list[dict]]:
     WHERE d.publish_date IS NOT NULL AND d.published_at IS NULL
     RETURN d.content_hash AS content_hash,
            d.publish_date AS publish_date,
+           d.doc_type AS doc_type,
            d.source_type AS source_type,
            d.title AS title
     """
@@ -268,6 +294,18 @@ def get_mentions_by_quarter(driver=None) -> dict[tuple[int, int], dict[str, list
            'risk' AS entity_type
     """
 
+    # Query for event announcements
+    event_query = """
+    MATCH (d:Document)-[r:ANNOUNCES]->(e:Event)
+    WHERE d.published_at IS NOT NULL
+    RETURN d.published_at.year AS year,
+           (d.published_at.month - 1) / 3 + 1 AS quarter,
+           d.content_hash AS doc_hash,
+           e.id AS entity_id,
+           e.name AS entity_name,
+           'event' AS entity_type
+    """
+
     # Fallback queries for unmigrated nodes
     cap_fallback = """
     MATCH (d:Document)-[r:MENTIONS]->(c:Capability)
@@ -299,13 +337,24 @@ def get_mentions_by_quarter(driver=None) -> dict[tuple[int, int], dict[str, list
            'risk' AS entity_type
     """
 
-    quarters = defaultdict(lambda: {"capabilities": [], "products": [], "risks": []})
+    event_fallback = """
+    MATCH (d:Document)-[r:ANNOUNCES]->(e:Event)
+    WHERE d.publish_date IS NOT NULL AND d.published_at IS NULL
+    RETURN d.publish_date AS publish_date,
+           d.content_hash AS doc_hash,
+           e.id AS entity_id,
+           e.name AS entity_name,
+           'event' AS entity_type
+    """
+
+    quarters = defaultdict(lambda: {"capabilities": [], "products": [], "risks": [], "events": []})
 
     # Execute native Date queries
     for query, entity_key in [
         (cap_query, "capabilities"),
         (prod_query, "products"),
         (risk_query, "risks"),
+        (event_query, "events"),
     ]:
         results = execute_query(query, driver=driver)
         for record in results:
@@ -317,6 +366,7 @@ def get_mentions_by_quarter(driver=None) -> dict[tuple[int, int], dict[str, list
         (cap_fallback, "capabilities"),
         (prod_fallback, "products"),
         (risk_fallback, "risks"),
+        (event_fallback, "events"),
     ]:
         results = execute_query(query, driver=driver)
         for record in results:
@@ -353,6 +403,7 @@ def compute_quarterly_signals(driver=None) -> QuarterlySignals:
     all_capabilities = set()
     all_products = set()
     all_risks = set()
+    all_events = set()
 
     for year, quarter in sorted(all_quarters):
         qm = QuarterlyMetrics(year=year, quarter=quarter)
@@ -363,18 +414,31 @@ def compute_quarterly_signals(driver=None) -> QuarterlySignals:
         total_docs += len(docs)
 
         for doc in docs:
-            source_type = doc.get("source_type", "").lower()
-            if "sec" in source_type:
+            doc_type = doc.get("doc_type", "unknown").lower()
+            if doc_type.startswith("sec_"):
                 qm.sec_filing_count += 1
-            elif "press" in source_type:
+                if doc_type == "sec_10k":
+                    qm.sec_10k_count += 1
+                elif doc_type == "sec_10q":
+                    qm.sec_10q_count += 1
+                elif doc_type == "sec_8k":
+                    qm.sec_8k_count += 1
+                elif doc_type == "sec_def14a":
+                    qm.sec_def14a_count += 1
+                else:
+                    qm.sec_other_count += 1
+            elif doc_type == "press_release":
                 qm.press_release_count += 1
-            elif "blog" in source_type:
+            elif doc_type == "blog_post":
                 qm.blog_count += 1
             else:
                 qm.other_count += 1
 
         # Count entity mentions
-        mentions = mentions_by_quarter.get((year, quarter), {"capabilities": [], "products": [], "risks": []})
+        mentions = mentions_by_quarter.get(
+            (year, quarter),
+            {"capabilities": [], "products": [], "risks": [], "events": []},
+        )
 
         # Capability mentions
         cap_entities = set()
@@ -409,6 +473,17 @@ def compute_quarterly_signals(driver=None) -> QuarterlySignals:
         qm.unique_risks = len(risk_entities)
         qm.risk_breakdown = dict(risk_counts)
 
+        # Event mentions
+        event_entities = set()
+        event_counts = defaultdict(int)
+        for m in mentions["events"]:
+            event_entities.add(m["entity_id"])
+            event_counts[m["entity_id"]] += 1
+            all_events.add(m["entity_id"])
+        qm.event_mention_count = len(mentions["events"])
+        qm.unique_events = len(event_entities)
+        qm.event_breakdown = dict(event_counts)
+
         metrics.append(qm)
 
     return QuarterlySignals(
@@ -418,6 +493,7 @@ def compute_quarterly_signals(driver=None) -> QuarterlySignals:
         total_capabilities=len(all_capabilities),
         total_products=len(all_products),
         total_risks=len(all_risks),
+        total_events=len(all_events),
     )
 
 
@@ -433,28 +509,35 @@ def print_signals(signals: QuarterlySignals) -> None:
     print(f"Unique capabilities: {signals.total_capabilities}")
     print(f"Unique products: {signals.total_products}")
     print(f"Unique risk topics: {signals.total_risks}")
+    print(f"Unique events: {signals.total_events}")
 
     if not signals.quarters:
         print("\nNo quarterly data available.")
         return
 
     # Print table header
-    print("\n" + "-" * 80)
-    print(f"{'Period':<10} {'Docs':>6} {'SEC':>5} {'AI Int':>8} {'Prod Cov':>9} {'Risk Den':>9}")
-    print("-" * 80)
+    print("\n" + "-" * 115)
+    print(f"{'Period':<10} {'Docs':>5} {'SEC':>4} {'10K':>4} {'10Q':>4} {'8K':>3} {'14A':>4} {'Oth':>4} {'AI Int':>8} {'Prod':>8} {'Risk':>8} {'Evt':>8}")
+    print("-" * 115)
 
     # Print each quarter
     for q in sorted(signals.quarters, key=lambda x: (x.year, x.quarter)):
         print(
             f"{q.period:<10} "
-            f"{q.document_count:>6} "
-            f"{q.sec_filing_count:>5} "
+            f"{q.document_count:>5} "
+            f"{q.sec_filing_count:>4} "
+            f"{q.sec_10k_count:>4} "
+            f"{q.sec_10q_count:>4} "
+            f"{q.sec_8k_count:>3} "
+            f"{q.sec_def14a_count:>4} "
+            f"{q.sec_other_count:>4} "
             f"{q.ai_intensity:>8.4f} "
-            f"{q.product_coverage:>9.4f} "
-            f"{q.risk_density:>9.4f}"
+            f"{q.product_coverage:>8.4f} "
+            f"{q.risk_density:>8.4f} "
+            f"{q.event_density:>8.4f}"
         )
 
-    print("-" * 80)
+    print("-" * 115)
 
     # Print signal trends
     if len(signals.quarters) >= 2:
@@ -465,19 +548,22 @@ def print_signals(signals: QuarterlySignals) -> None:
         ai_change = last.ai_intensity - first.ai_intensity
         prod_change = last.product_coverage - first.product_coverage
         risk_change = last.risk_density - first.risk_density
+        event_change = last.event_density - first.event_density
 
-        print(f"  AI Intensity:    {first.ai_intensity:.4f} → {last.ai_intensity:.4f} ({ai_change:+.4f})")
+        print(f"  AI Intensity:     {first.ai_intensity:.4f} → {last.ai_intensity:.4f} ({ai_change:+.4f})")
         print(f"  Product Coverage: {first.product_coverage:.4f} → {last.product_coverage:.4f} ({prod_change:+.4f})")
-        print(f"  Risk Density:    {first.risk_density:.4f} → {last.risk_density:.4f} ({risk_change:+.4f})")
+        print(f"  Risk Density:     {first.risk_density:.4f} → {last.risk_density:.4f} ({risk_change:+.4f})")
+        print(f"  Event Density:    {first.event_density:.4f} → {last.event_density:.4f} ({event_change:+.4f})")
 
     # Print top entities by mention count
-    print("\n" + "-" * 80)
+    print("\n" + "-" * 90)
     print("Top Entities (by total mentions across all quarters):")
 
     # Aggregate across quarters
     cap_totals = defaultdict(int)
     prod_totals = defaultdict(int)
     risk_totals = defaultdict(int)
+    event_totals = defaultdict(int)
 
     for q in signals.quarters:
         for entity_id, count in q.capability_breakdown.items():
@@ -486,6 +572,8 @@ def print_signals(signals: QuarterlySignals) -> None:
             prod_totals[entity_id] += count
         for entity_id, count in q.risk_breakdown.items():
             risk_totals[entity_id] += count
+        for entity_id, count in q.event_breakdown.items():
+            event_totals[entity_id] += count
 
     print("\n  Capabilities:")
     for entity_id, count in sorted(cap_totals.items(), key=lambda x: x[1], reverse=True)[:5]:
@@ -499,7 +587,11 @@ def print_signals(signals: QuarterlySignals) -> None:
     for entity_id, count in sorted(risk_totals.items(), key=lambda x: x[1], reverse=True)[:5]:
         print(f"    {entity_id}: {count}")
 
-    print("\n" + "=" * 80)
+    print("\n  Events:")
+    for entity_id, count in sorted(event_totals.items(), key=lambda x: x[1], reverse=True)[:5]:
+        print(f"    {entity_id}: {count}")
+
+    print("\n" + "=" * 90)
 
 
 def main():
