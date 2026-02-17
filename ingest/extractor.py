@@ -176,6 +176,10 @@ class LinkExtractor:
 
             # Actual filing documents (HTML files in Archives)
             elif "/Archives/edgar/data/" in href and href.endswith((".htm", ".html")):
+                # Strip XBRL Inline Viewer wrapper to get direct document URL
+                # e.g. /ix?doc=/Archives/edgar/data/.../file.htm → /Archives/...
+                if href.startswith("/ix?doc="):
+                    href = href.split("doc=", 1)[1]
                 # Skip index files, we want actual documents
                 if "index" not in href.lower():
                     full_url = urljoin(base_url, href)

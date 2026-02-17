@@ -127,22 +127,31 @@ class HTMLExtractor:
         # Extract title
         title = self._extract_title(soup)
 
-        # Remove boilerplate elements
+        # Detect SEC filings: iXBRL (post-2020) or SGML wrapper (pre-2020)
+        # These use flat div structures with no semantic content containers
+        is_sec_filing = bool(soup.find(re.compile(r"^ix:"))) or "<DOCUMENT>" in html[:200]
+
+        # Remove boilerplate elements (also strips iXBRL metadata)
         self._remove_boilerplate(soup)
 
         # Remove comments
         for comment in soup.find_all(string=lambda t: isinstance(t, Comment)):
             comment.extract()
 
-        # Try to find main content container
-        main_content = self._find_main_content(soup)
-        if main_content:
-            text = self._extract_text(main_content)
-        else:
-            # Fallback to body or entire document
+        if is_sec_filing:
+            # SEC filings use flat div structure — use full body
             body = soup.find("body")
             text = self._extract_text(body if body else soup)
-            warnings.append("Could not identify main content container")
+        else:
+            # Try to find main content container
+            main_content = self._find_main_content(soup)
+            if main_content:
+                text = self._extract_text(main_content)
+            else:
+                # Fallback to body or entire document
+                body = soup.find("body")
+                text = self._extract_text(body if body else soup)
+                warnings.append("Could not identify main content container")
 
         # Normalize text
         text = self._normalize_text(text)
@@ -226,8 +235,38 @@ class HTMLExtractor:
 
         return None
 
+    def _strip_ixbrl(self, soup: BeautifulSoup) -> None:
+        """Strip XBRL inline tags from iXBRL filings.
+
+        SEC filings post-2020 use inline XBRL (iXBRL) which embeds XBRL
+        metadata directly in HTML. This metadata pollutes text extraction.
+
+        Strategy:
+        - Decompose tags that contain only metadata (ix:hidden, ix:header, etc.)
+        - Unwrap tags that wrap visible text (ix:nonFraction, ix:nonNumeric, etc.)
+        """
+        # Tags containing only XBRL metadata — remove entirely
+        for tag_name in ["ix:hidden", "ix:header", "ix:references", "ix:resources"]:
+            for tag in soup.find_all(tag_name):
+                tag.decompose()
+
+        # Tags wrapping visible content — unwrap (keep text, remove tag)
+        for tag_name in [
+            "ix:nonfraction", "ix:nonnumeric", "ix:continuation",
+            "ix:footnote", "ix:fraction", "ix:numerator", "ix:denominator",
+        ]:
+            for tag in soup.find_all(tag_name):
+                tag.unwrap()
+
+        # Remove any remaining ix: namespace tags not caught above
+        for tag in soup.find_all(re.compile(r"^ix:")):
+            tag.decompose()
+
     def _remove_boilerplate(self, soup: BeautifulSoup) -> None:
         """Remove boilerplate elements from soup in place."""
+        # Strip iXBRL metadata before boilerplate removal
+        self._strip_ixbrl(soup)
+
         # Remove known boilerplate tags
         for tag_name in BOILERPLATE_TAGS:
             for tag in soup.find_all(tag_name):

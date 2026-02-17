@@ -106,7 +106,6 @@ CONTENT_PATTERNS = {
         r"FORM\s+10-K",
         r"ANNUAL\s+REPORT",
         r"For the fiscal year ended",
-        r"pursuant to Section 13 or 15\(d\)",
     ],
     DocType.SEC_10Q: [
         r"FORM\s+10-Q",
@@ -116,7 +115,6 @@ CONTENT_PATTERNS = {
     DocType.SEC_8K: [
         r"FORM\s+8-K",
         r"CURRENT\s+REPORT",
-        r"Pursuant to Section 13 or 15\(d\)",
     ],
     DocType.SEC_DEF14A: [
         r"SCHEDULE\s+14A",
@@ -200,34 +198,51 @@ class DocumentClassifier:
                 signals.append(f"title: {title_result[2]}")
 
         # Check content patterns (first 5000 chars)
+        # SEC form type declarations appear in the header (~first 500 chars).
+        # Matches in the header get a higher score to distinguish a document's
+        # own type from references to other filing types deeper in the text.
         if text:
+            header_text = text[:500]
             content_text = text[:5000]
             for doc_type, patterns in CONTENT_PATTERNS.items():
                 for pattern in patterns:
-                    if re.search(pattern, content_text, re.IGNORECASE):
-                        scores[doc_type] += 0.2
+                    if re.search(pattern, header_text, re.IGNORECASE):
+                        scores[doc_type] += 0.3
+                        signals.append(f"header_pattern: {pattern}")
+                    elif re.search(pattern, content_text, re.IGNORECASE):
+                        scores[doc_type] += 0.1
                         signals.append(f"content_pattern: {pattern}")
 
         # Find highest scoring type
         best_type = max(scores, key=scores.get)
         best_score = scores[best_type]
 
+        # Exhibit/index URLs must never be classified as primary filings.
+        # Their content references parent filing types (e.g. SOX certs say
+        # "Form 10-K") which can outscore sec_other.
+        if self._is_exhibit_url(url) and best_type in (
+            DocType.SEC_10K, DocType.SEC_10Q,
+            DocType.SEC_8K, DocType.SEC_DEF14A,
+        ):
+            best_type = DocType.SEC_OTHER
+            best_score = scores[DocType.SEC_OTHER]
+            signals.append("demoted: exhibit URL → sec_other")
+
         # Promote specific SEC filings over generic sec_other.
         # When sec_other wins (from broad EDGAR URL + source_type) but a
         # specific filing type (8-K, 10-Q, 10-K) also has signal, prefer it.
-        # Skip promotion for exhibit/index URLs — their content often
-        # references the parent filing type (e.g. SOX certs say "Form 10-K").
+        # Skip promotion for exhibit/index URLs (handled above).
         if best_type == DocType.SEC_OTHER and not self._is_exhibit_url(url):
             specific_sec_types = [
                 DocType.SEC_10K, DocType.SEC_10Q,
                 DocType.SEC_8K, DocType.SEC_DEF14A,
             ]
-            for stype in specific_sec_types:
-                if scores[stype] > 0:
-                    best_type = stype
-                    best_score = max(best_score, scores[stype])
-                    signals.append(f"promoted: {stype.value} over sec_other")
-                    break
+            # Pick the highest-scoring specific type (not just first with signal)
+            best_specific = max(specific_sec_types, key=lambda t: scores[t])
+            if scores[best_specific] > 0:
+                best_type = best_specific
+                best_score = max(best_score, scores[best_specific])
+                signals.append(f"promoted: {best_specific.value} over sec_other")
 
         # If no strong signal, default to unknown
         if best_score < 0.2:
@@ -345,6 +360,9 @@ class DocumentClassifier:
             return True
         # Alternate exhibit 99.x naming: x991, x992 (without 'ex' prefix)
         if re.search(r"x99\d", url_lower):
+            return True
+        # Explicit "exhibit" in filename (e.g., a8-kaexhibit993.htm)
+        if "exhibit" in url_lower:
             return True
         # EDGAR index pages
         if "-index.htm" in url_lower:
