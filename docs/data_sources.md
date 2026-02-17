@@ -8,7 +8,7 @@ This project uses **exclusively public data sources**. No paywalled, credentiale
 
 ### SEC Filings (Highest Priority)
 - **Source**: SEC EDGAR (https://www.sec.gov/cgi-bin/browse-edgar)
-- **Filing Types**: 10-K, 10-Q, 8-K
+- **Filing Types**: 10-K, 10-Q, 8-K, DEF 14A (see [canonical_corpus.md](canonical_corpus.md))
 - **Access**: Free, public, no authentication required
 - **Notes**: Primary source for risk disclosures and official financial communications
 

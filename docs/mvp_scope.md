@@ -10,8 +10,8 @@ This target balances comprehensive coverage with project feasibility for a term-
 
 | Source Type | Target Count | Priority | Notes |
 |-------------|--------------|----------|-------|
-| SEC Filings (10-K, 10-Q) | 40–50 | High | ~4 per year (2015–present) |
-| SEC Filings (8-K) | 50–80 | Medium | Major announcements only |
+| SEC Filings (10-K, 10-Q, DEF 14A) | 40–70 | High | ~5 per year (2013–present); see [canonical_corpus.md](canonical_corpus.md) |
+| SEC Filings (8-K) | 50–80 | Medium | Items 2.02 and 8.01 only |
 | Earnings Call Transcripts | 40–50 | High | Quarterly calls (2015–present) |
 | Press Releases | 80–120 | High | AI/product-related releases |
 | Corporate Blog Posts | 50–80 | Medium | Technology and product blogs |

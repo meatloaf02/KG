@@ -345,6 +345,9 @@ class DocumentClassifier:
                     return f"Q{quarter_match.group(1)} {quarter_match.group(2)} Earnings Call"
             return "Earnings Call Transcript"
 
+        if doc_type == DocType.SEC_DEF14A:
+            return "Proxy Statement"
+
         if doc_type == DocType.SEC_OTHER:
             return self._get_sec_other_subtype(url, text)
 
@@ -355,8 +358,11 @@ class DocumentClassifier:
         if not url:
             return False
         url_lower = url.lower()
-        # Standard exhibit patterns: dex311, xex231, ex101, etc.
-        if re.search(r"ex\d{2,3}", url_lower):
+        # EDGAR search/browse pages (not filings)
+        if "browse-edgar" in url_lower:
+            return True
+        # Standard exhibit patterns: dex311, xex231, ex101, ex3-1, etc.
+        if re.search(r"ex\d[\d-]+", url_lower):
             return True
         # Alternate exhibit 99.x naming: x991, x992 (without 'ex' prefix)
         if re.search(r"x99\d", url_lower):
@@ -385,8 +391,8 @@ class DocumentClassifier:
         if "-index.htm" in url_lower:
             return "index_page"
 
-        # 2. Exhibit detection by URL pattern (ex + number)
-        exhibit_match = re.search(r"ex(\d{2,3})", url_lower)
+        # 2. Exhibit detection by URL pattern (ex + number, incl. hyphenated)
+        exhibit_match = re.search(r"ex(\d[\d-]+)", url_lower)
         if exhibit_match:
             exhibit_num = exhibit_match.group(1)
             # SOX certifications: EX-31.x, EX-32.x

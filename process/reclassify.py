@@ -21,13 +21,19 @@ from process.doc_classifier import DocumentClassifier
 logger = setup_logging(__name__)
 
 
-def _is_analysis_eligible(doc_type: str, doc_sub_type: str | None) -> bool:
+def _is_analysis_eligible(
+    doc_type: str,
+    doc_sub_type: str | None,
+    char_count: int = 0,
+) -> bool:
     """Check if a document is eligible for canonical analysis."""
+    if char_count < 100:
+        return False
     if doc_type == "sec_10k" and doc_sub_type == "Annual Report":
         return True
     if doc_type == "sec_10q" and doc_sub_type == "Quarterly Report":
         return True
-    if doc_type == "sec_def14a":
+    if doc_type == "sec_def14a" and doc_sub_type == "Proxy Statement":
         return True
     if doc_type == "sec_8k" and doc_sub_type:
         if "2.02" in doc_sub_type or "8.01" in doc_sub_type:
@@ -75,7 +81,10 @@ def reclassify_all(dry_run: bool = True) -> dict:
             new_type = result.doc_type.value
             new_confidence = result.confidence
             new_sub_type = result.sub_type
-            new_eligible = _is_analysis_eligible(new_type, new_sub_type)
+            new_eligible = _is_analysis_eligible(
+                new_type, new_sub_type,
+                char_count=data.get("char_count", 0),
+            )
 
             old_type = data.get("doc_type")
             old_sub_type = data.get("doc_sub_type")

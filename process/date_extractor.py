@@ -73,8 +73,12 @@ class DateExtractor:
         if not url:
             return None
 
-        # SEC accession number pattern: 0001193125-YY-NNNNNN
+        # SEC accession number — hyphenated: 0001193125-24-012345
         sec_match = re.search(r"/(\d{10})-(\d{2})-(\d+)", url)
+        if not sec_match:
+            # Unhyphenated path component: /000110465925038009/
+            # 18 digits: 10-digit CIK + 2-digit year + 6-digit sequence
+            sec_match = re.search(r"/(\d{10})(\d{2})(\d{6})/", url)
         if sec_match:
             year_suffix = sec_match.group(2)
             year = 2000 + int(year_suffix) if int(year_suffix) < 50 else 1900 + int(year_suffix)
@@ -226,8 +230,10 @@ class DateExtractor:
         # Extract filename from URL
         filename = url.split("/")[-1].lower() if "/" in url else url.lower()
 
-        # Pattern 1: wd-YYYYMMDD (8 digits, year first)
-        match = re.search(r"wd-(\d{4})(\d{2})(\d{2})", filename)
+        # Pattern 1: wd-YYYYMMDD or wday-YYYYMMDD (8 digits, year first)
+        # Must be tried before MMDDYYYY patterns to avoid false matches
+        # (e.g., wday-20220131 incorrectly parsed as month=20 or single-digit month=2)
+        match = re.search(r"wd(?:ay)?-(\d{4})(\d{2})(\d{2})", filename)
         if match:
             try:
                 date = datetime(
