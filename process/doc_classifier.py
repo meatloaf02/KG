@@ -215,7 +215,9 @@ class DocumentClassifier:
         # Promote specific SEC filings over generic sec_other.
         # When sec_other wins (from broad EDGAR URL + source_type) but a
         # specific filing type (8-K, 10-Q, 10-K) also has signal, prefer it.
-        if best_type == DocType.SEC_OTHER:
+        # Skip promotion for exhibit/index URLs — their content often
+        # references the parent filing type (e.g. SOX certs say "Form 10-K").
+        if best_type == DocType.SEC_OTHER and not self._is_exhibit_url(url):
             specific_sec_types = [
                 DocType.SEC_10K, DocType.SEC_10Q,
                 DocType.SEC_8K, DocType.SEC_DEF14A,
@@ -332,6 +334,22 @@ class DocumentClassifier:
             return self._get_sec_other_subtype(url, text)
 
         return None
+
+    def _is_exhibit_url(self, url: Optional[str]) -> bool:
+        """Check if URL indicates an exhibit or index page (not a primary filing)."""
+        if not url:
+            return False
+        url_lower = url.lower()
+        # Standard exhibit patterns: dex311, xex231, ex101, etc.
+        if re.search(r"ex\d{2,3}", url_lower):
+            return True
+        # Alternate exhibit 99.x naming: x991, x992 (without 'ex' prefix)
+        if re.search(r"x99\d", url_lower):
+            return True
+        # EDGAR index pages
+        if "-index.htm" in url_lower:
+            return True
+        return False
 
     def _get_sec_other_subtype(
         self,

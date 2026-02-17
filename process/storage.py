@@ -59,6 +59,9 @@ class ProcessedDocument:
     processor_version: str
     extraction_warnings: list[str]
 
+    # Analysis flags (defaulted for backward compat with existing JSONs)
+    analysis_eligible: bool = False
+
     def to_dict(self) -> dict:
         """Convert to dictionary for serialization."""
         return asdict(self)
@@ -66,6 +69,7 @@ class ProcessedDocument:
     @classmethod
     def from_dict(cls, data: dict) -> "ProcessedDocument":
         """Create from dictionary."""
+        data.setdefault("analysis_eligible", False)
         return cls(**data)
 
 

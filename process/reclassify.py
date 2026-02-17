@@ -3,7 +3,7 @@ Reclassify processed documents with updated classifier rules.
 
 Iterates data/interim/**/*.json, re-runs DocumentClassifier.classify(),
 and updates only classification fields (doc_type, doc_type_confidence,
-doc_sub_type). All other fields (text, sentences, dates) are preserved.
+doc_sub_type, analysis_eligible). All other fields are preserved.
 
 Usage:
     python3 -m process.reclassify --dry-run   # Preview changes
@@ -19,6 +19,20 @@ from config import INTERIM_DATA_DIR, setup_logging
 from process.doc_classifier import DocumentClassifier
 
 logger = setup_logging(__name__)
+
+
+def _is_analysis_eligible(doc_type: str, doc_sub_type: str | None) -> bool:
+    """Check if a document is eligible for canonical analysis."""
+    if doc_type == "sec_10k" and doc_sub_type == "Annual Report":
+        return True
+    if doc_type == "sec_10q" and doc_sub_type == "Quarterly Report":
+        return True
+    if doc_type == "sec_def14a":
+        return True
+    if doc_type == "sec_8k" and doc_sub_type:
+        if "2.02" in doc_sub_type or "8.01" in doc_sub_type:
+            return True
+    return False
 
 
 def reclassify_all(dry_run: bool = True) -> dict:
@@ -37,6 +51,7 @@ def reclassify_all(dry_run: bool = True) -> dict:
     changed = 0
     unchanged = 0
     errors = 0
+    eligible_count = 0
     changes_detail: list[dict] = []
     new_type_counts: Counter = Counter()
     new_subtype_counts: Counter = Counter()
@@ -60,18 +75,23 @@ def reclassify_all(dry_run: bool = True) -> dict:
             new_type = result.doc_type.value
             new_confidence = result.confidence
             new_sub_type = result.sub_type
+            new_eligible = _is_analysis_eligible(new_type, new_sub_type)
 
             old_type = data.get("doc_type")
             old_sub_type = data.get("doc_sub_type")
+            old_eligible = data.get("analysis_eligible", False)
 
             new_type_counts[new_type] += 1
             if new_type == "sec_other" and new_sub_type:
                 new_subtype_counts[new_sub_type] += 1
+            if new_eligible:
+                eligible_count += 1
 
             if (
                 new_type != old_type
                 or new_confidence != data.get("doc_type_confidence")
                 or new_sub_type != old_sub_type
+                or new_eligible != old_eligible
             ):
                 changed += 1
                 changes_detail.append({
@@ -80,12 +100,14 @@ def reclassify_all(dry_run: bool = True) -> dict:
                     "new_type": new_type,
                     "old_sub": old_sub_type,
                     "new_sub": new_sub_type,
+                    "eligible": new_eligible,
                 })
 
                 if not dry_run:
                     data["doc_type"] = new_type
                     data["doc_type_confidence"] = new_confidence
                     data["doc_sub_type"] = new_sub_type
+                    data["analysis_eligible"] = new_eligible
                     with open(json_path, "w", encoding="utf-8") as f:
                         json.dump(data, f, indent=2, ensure_ascii=False)
             else:
@@ -100,10 +122,11 @@ def reclassify_all(dry_run: bool = True) -> dict:
     print(f"\n{'=' * 60}")
     print(f"Reclassification Summary {mode}")
     print(f"{'=' * 60}")
-    print(f"  Total documents:  {total}")
-    print(f"  Changed:          {changed}")
-    print(f"  Unchanged:        {unchanged}")
-    print(f"  Errors:           {errors}")
+    print(f"  Total documents:      {total}")
+    print(f"  Changed:              {changed}")
+    print(f"  Unchanged:            {unchanged}")
+    print(f"  Errors:               {errors}")
+    print(f"  Analysis eligible:    {eligible_count}  ({100*eligible_count/total:.1f}%)")
 
     if changes_detail:
         # Show type promotions

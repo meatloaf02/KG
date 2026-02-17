@@ -94,6 +94,7 @@ INDEX_QUERIES = [
     "CREATE INDEX ON :Document(published_at);",
     "CREATE INDEX ON :Document(doc_type);",
     "CREATE INDEX ON :Document(doc_sub_type);",
+    "CREATE INDEX ON :Document(analysis_eligible);",
     "CREATE INDEX ON :Document(source_type);",
     # Company indexes
     "CREATE INDEX ON :Company(id);",
@@ -139,6 +140,7 @@ ON CREATE SET
     d.title = $title,
     d.doc_type = $doc_type,
     d.doc_sub_type = $doc_sub_type,
+    d.analysis_eligible = $analysis_eligible,
     d.source_type = $source_type,
     d.publish_date = $publish_date,
     d.published_at = CASE WHEN $publish_date IS NOT NULL THEN date($publish_date) ELSE NULL END,
@@ -148,6 +150,7 @@ ON MATCH SET
     d.title = $title,
     d.doc_type = $doc_type,
     d.doc_sub_type = $doc_sub_type,
+    d.analysis_eligible = $analysis_eligible,
     d.publish_date = $publish_date,
     d.published_at = CASE WHEN $publish_date IS NOT NULL THEN date($publish_date) ELSE NULL END,
     d.updated_at = timestamp()
@@ -401,6 +404,7 @@ class DocumentNode:
     publish_date: Optional[str] = None
     source_url: Optional[str] = None
     doc_sub_type: Optional[str] = None
+    analysis_eligible: bool = False
 
     def to_dict(self) -> dict:
         """Convert to dictionary for Cypher parameters."""
@@ -413,6 +417,7 @@ class DocumentNode:
             "publish_date": self.publish_date,
             "source_url": self.source_url,
             "doc_sub_type": self.doc_sub_type,
+            "analysis_eligible": self.analysis_eligible,
         }
 
 

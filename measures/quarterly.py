@@ -214,6 +214,7 @@ def get_documents_by_quarter(driver=None) -> dict[tuple[int, int], list[dict]]:
            d.published_at.year AS year,
            (d.published_at.month - 1) / 3 + 1 AS quarter,
            d.doc_type AS doc_type,
+           d.analysis_eligible AS analysis_eligible,
            d.source_type AS source_type,
            d.title AS title
     ORDER BY d.published_at
@@ -233,6 +234,7 @@ def get_documents_by_quarter(driver=None) -> dict[tuple[int, int], list[dict]]:
     RETURN d.content_hash AS content_hash,
            d.publish_date AS publish_date,
            d.doc_type AS doc_type,
+           d.analysis_eligible AS analysis_eligible,
            d.source_type AS source_type,
            d.title AS title
     """
@@ -408,8 +410,9 @@ def compute_quarterly_signals(driver=None) -> QuarterlySignals:
     for year, quarter in sorted(all_quarters):
         qm = QuarterlyMetrics(year=year, quarter=quarter)
 
-        # Count documents by type
-        docs = docs_by_quarter.get((year, quarter), [])
+        # Count only analysis-eligible documents
+        all_docs = docs_by_quarter.get((year, quarter), [])
+        docs = [d for d in all_docs if d.get("analysis_eligible", False)]
         qm.document_count = len(docs)
         total_docs += len(docs)
 

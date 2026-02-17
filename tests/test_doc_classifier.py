@@ -195,3 +195,50 @@ class TestSecOtherSubtypes:
         )
         assert result.doc_type == DocType.SEC_OTHER
         assert result.sub_type == "filing_document"
+
+
+# =========================================================================
+# D. Exhibit promotion guard
+# =========================================================================
+
+
+class TestExhibitPromotionGuard:
+    """Exhibits with filing-type content must NOT be promoted out of sec_other."""
+
+    def test_sox_cert_with_10k_content_stays_sec_other(self, classifier):
+        """EX-31.1 (SOX cert) references 'Form 10-K' but should stay sec_other."""
+        result = classifier.classify(
+            url="https://www.sec.gov/Archives/edgar/data/1327811/000132781123000024/wday-01312023xex311.htm",
+            text="Exhibit 31.1\nI have reviewed this Annual Report on Form 10-K of Workday, Inc.",
+            source_type="sec_filing",
+        )
+        assert result.doc_type == DocType.SEC_OTHER
+        assert result.sub_type == "exhibit_certification"
+
+    def test_press_release_x991_with_10k_content_stays_sec_other(self, classifier):
+        """EX-99.1 press release references 'Form 10-K' but should stay sec_other."""
+        result = classifier.classify(
+            url="https://www.sec.gov/Archives/edgar/data/1327811/000132781120000021/wday-4302020x991.htm",
+            text="This press release... FORM 10-K For the fiscal year ended January 31, 2020",
+            source_type="sec_filing",
+        )
+        assert result.doc_type == DocType.SEC_OTHER
+
+    def test_real_10k_still_promoted(self, classifier):
+        """Actual 10-K filing URL should still be promoted correctly."""
+        result = classifier.classify(
+            url="https://www.sec.gov/Archives/edgar/data/1327811/000132781123000024/wday-01312023x10k.htm",
+            text="FORM 10-K ANNUAL REPORT For the fiscal year ended January 31, 2023",
+            source_type="sec_filing",
+        )
+        assert result.doc_type == DocType.SEC_10K
+
+    def test_index_page_with_filing_content_stays_sec_other(self, classifier):
+        """EDGAR index page with filing content should stay sec_other."""
+        result = classifier.classify(
+            url="https://www.sec.gov/Archives/edgar/data/1327811/000132781123000024/0001327811-23-000024-index.htm",
+            text="FORM 10-K Annual Report filing index",
+            source_type="sec_filing",
+        )
+        assert result.doc_type == DocType.SEC_OTHER
+        assert result.sub_type == "index_page"

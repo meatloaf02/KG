@@ -1,8 +1,8 @@
 """
-Entity extraction runner (NOR-107, NOR-108, NOR-109).
+Entity extraction runner (NOR-107, NOR-108, NOR-109, NOR-136).
 
 Runs entity extraction on all processed documents and loads
-the resulting mentions into Memgraph as MENTIONS/DISCLOSES relationships.
+the resulting mentions into Memgraph as MENTIONS/DISCLOSES/ANNOUNCES relationships.
 
 Usage:
     python -m measures.run_extraction                  # Extract from all docs
@@ -24,7 +24,8 @@ from config import setup_logging
 from kg.loaders import KGLoader
 from kg.schema import Evidence
 from measures.extractor import EntityExtractor, ExtractionResult
-from measures.lexicons import AI_CAPABILITY_LEXICON, PRODUCT_LEXICON, RISK_LEXICON
+from measures.lexicons import AI_CAPABILITY_LEXICON, EVENT_LEXICON, PRODUCT_LEXICON, RISK_LEXICON
+from measures.quarterly import parse_quarter_from_date
 from process.storage import ProcessedDocumentStorage
 
 logger = setup_logging(__name__)
@@ -45,16 +46,19 @@ class ExtractionStats:
     capability_mentions: int = 0
     product_mentions: int = 0
     risk_mentions: int = 0
+    event_mentions: int = 0
 
     # Relationship counts (loaded into KG)
     capability_relationships: int = 0
     product_relationships: int = 0
     risk_relationships: int = 0
+    event_relationships: int = 0
 
     # Entity distribution
     capability_counts: dict = field(default_factory=lambda: defaultdict(int))
     product_counts: dict = field(default_factory=lambda: defaultdict(int))
     risk_counts: dict = field(default_factory=lambda: defaultdict(int))
+    event_counts: dict = field(default_factory=lambda: defaultdict(int))
 
     errors: list = field(default_factory=list)
 
@@ -137,6 +141,7 @@ def extract_and_load_document(
     loader: KGLoader,
     stats: ExtractionStats,
     dry_run: bool = False,
+    publish_date: Optional[str] = None,
 ) -> bool:
     """
     Extract entities from a document and load into KG.
@@ -148,6 +153,7 @@ def extract_and_load_document(
         loader: KGLoader instance
         stats: ExtractionStats to update
         dry_run: If True, don't load into KG
+        publish_date: Document publish date (for deriving event quarter)
 
     Returns:
         True if successful
@@ -160,6 +166,7 @@ def extract_and_load_document(
         doc_capabilities = set()
         doc_products = set()
         doc_risks = set()
+        doc_events = set()
 
         # Process capability mentions
         for mention in result.capability_mentions:
@@ -224,10 +231,49 @@ def extract_and_load_document(
                 if load_result.success:
                     stats.risk_relationships += 1
 
+        # Process event mentions (quarter-scoped IDs)
+        parsed_quarter = parse_quarter_from_date(publish_date)
+        for mention in result.event_mentions:
+            if parsed_quarter:
+                year, quarter = parsed_quarter
+                event_instance_id = f"{mention.entity_id}-{year}-Q{quarter}"
+            else:
+                # No date available — use type slug as fallback
+                event_instance_id = mention.entity_id
+
+            doc_events.add(event_instance_id)
+            stats.event_counts[event_instance_id] += 1
+
+            if not dry_run:
+                # Create event node on-the-fly (idempotent MERGE)
+                loader.load_event({
+                    "id": event_instance_id,
+                    "name": mention.name,
+                    "event_type": mention.category,
+                    "event_date": publish_date,
+                    "description": None,
+                })
+
+                evidence = Evidence(
+                    text=mention.match_text,
+                    sentence_id=f"{doc_hash[:16]}-ext",
+                    start_char=mention.start_char,
+                    end_char=mention.end_char,
+                    confidence=mention.confidence,
+                    extracted_at=datetime.now(timezone.utc),
+                    extractor_version=EXTRACTOR_VERSION,
+                )
+                load_result = loader.load_announcement_event(
+                    doc_hash, event_instance_id, evidence
+                )
+                if load_result.success:
+                    stats.event_relationships += 1
+
         # Update document-level stats
         stats.capability_mentions += len(doc_capabilities)
         stats.product_mentions += len(doc_products)
         stats.risk_mentions += len(doc_risks)
+        stats.event_mentions += len(doc_events)
         stats.processed_docs += 1
 
         return True
@@ -303,6 +349,12 @@ def run_extraction(
                 pbar.update(1)
                 continue
 
+            # Load publish_date from processed doc metadata
+            publish_date = None
+            processed_doc = storage.load(content_hash)
+            if processed_doc:
+                publish_date = processed_doc.publish_date
+
             # Extract and load
             extract_and_load_document(
                 content_hash,
@@ -311,6 +363,7 @@ def run_extraction(
                 loader if not dry_run else KGLoader.__new__(KGLoader),  # Dummy for dry run
                 stats,
                 dry_run=dry_run,
+                publish_date=publish_date,
             )
             pbar.update(1)
 
@@ -363,12 +416,14 @@ def print_stats(stats: ExtractionStats):
     print(f"    Capabilities: {stats.capability_mentions}")
     print(f"    Products: {stats.product_mentions}")
     print(f"    Risks: {stats.risk_mentions}")
+    print(f"    Events: {stats.event_mentions}")
 
-    if stats.capability_relationships or stats.product_relationships or stats.risk_relationships:
+    if stats.capability_relationships or stats.product_relationships or stats.risk_relationships or stats.event_relationships:
         print(f"\n  Relationships Loaded:")
         print(f"    MENTIONS (Capability): {stats.capability_relationships}")
         print(f"    MENTIONS (Product): {stats.product_relationships}")
         print(f"    DISCLOSES (Risk): {stats.risk_relationships}")
+        print(f"    ANNOUNCES (Event): {stats.event_relationships}")
 
     # Top entities
     if stats.capability_counts:
@@ -387,6 +442,12 @@ def print_stats(stats: ExtractionStats):
         print(f"\n  Top 10 Risk Topics:")
         sorted_risks = sorted(stats.risk_counts.items(), key=lambda x: x[1], reverse=True)[:10]
         for entity_id, count in sorted_risks:
+            print(f"    {entity_id}: {count} mentions")
+
+    if stats.event_counts:
+        print(f"\n  Top 10 Events:")
+        sorted_events = sorted(stats.event_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+        for entity_id, count in sorted_events:
             print(f"    {entity_id}: {count} mentions")
 
     if stats.errors:

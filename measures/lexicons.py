@@ -1,8 +1,12 @@
 """
-Entity lexicons for mention extraction (NOR-107, NOR-109).
+Entity lexicons for mention extraction (NOR-107, NOR-109, NOR-136).
 
 Contains dictionaries mapping surface forms to normalized entity IDs
-for products, capabilities, and risk topics.
+for products, capabilities, risk topics, and events.
+
+Each lexicon maps: surface_form -> (entity_id, canonical_name, category)
+For events, entity_id is a type slug; the runner appends the quarter
+to create instance IDs (e.g., "earnings-call-2024-Q1").
 """
 
 from dataclasses import dataclass
@@ -14,7 +18,7 @@ class EntityMatch:
     """A matched entity in text."""
 
     entity_id: str
-    entity_type: str  # "capability", "product", "risk"
+    entity_type: str  # "capability", "product", "risk", "event"
     name: str
     normalized_name: str
     category: Optional[str]
@@ -282,6 +286,68 @@ RISK_LEXICON = {
     "technical debt": ("integration-risk", "Integration Risk", "technology"),
 }
 
+# =============================================================================
+# Event Lexicon (NOR-136)
+# =============================================================================
+
+# Map surface forms -> (event_type_slug, canonical_name, category)
+# The runner generates instance IDs by appending the quarter:
+#   e.g., "earnings-call" + "2024-Q1" -> "earnings-call-2024-Q1"
+EVENT_LEXICON = {
+    # Earnings calls
+    "earnings call": ("earnings-call", "Earnings Call", "earnings_call"),
+    "earnings conference call": ("earnings-call", "Earnings Call", "earnings_call"),
+    "quarterly earnings": ("earnings-call", "Earnings Call", "earnings_call"),
+    "fiscal quarter results": ("earnings-call", "Earnings Call", "earnings_call"),
+    "financial results": ("earnings-call", "Earnings Call", "earnings_call"),
+
+    # Product launches
+    "product launch": ("product-launch", "Product Launch", "product_launch"),
+    "new product": ("product-launch", "Product Launch", "product_launch"),
+    "general availability": ("product-launch", "Product Launch", "product_launch"),
+    "now available": ("product-launch", "Product Launch", "product_launch"),
+    "announces the launch": ("product-launch", "Product Launch", "product_launch"),
+    "introduces": ("product-launch", "Product Launch", "product_launch"),
+
+    # Acquisitions
+    "acquisition": ("acquisition", "Acquisition", "acquisition"),
+    "acquired": ("acquisition", "Acquisition", "acquisition"),
+    "to acquire": ("acquisition", "Acquisition", "acquisition"),
+    "merger": ("acquisition", "Acquisition", "acquisition"),
+    "definitive agreement": ("acquisition", "Acquisition", "acquisition"),
+
+    # Partnerships
+    "partnership": ("partnership", "Partnership", "partnership"),
+    "strategic partnership": ("partnership", "Partnership", "partnership"),
+    "collaboration": ("partnership", "Partnership", "partnership"),
+    "joint venture": ("partnership", "Partnership", "partnership"),
+    "alliance": ("partnership", "Partnership", "partnership"),
+    "partners with": ("partnership", "Partnership", "partnership"),
+
+    # Leadership changes
+    "chief executive officer": ("leadership-change", "Leadership Change", "leadership_change"),
+    "ceo appointment": ("leadership-change", "Leadership Change", "leadership_change"),
+    "appointed": ("leadership-change", "Leadership Change", "leadership_change"),
+    "board of directors": ("leadership-change", "Leadership Change", "leadership_change"),
+    "executive appointment": ("leadership-change", "Leadership Change", "leadership_change"),
+    "names new": ("leadership-change", "Leadership Change", "leadership_change"),
+
+    # Conferences
+    "investor conference": ("conference", "Conference", "conference"),
+    "annual conference": ("conference", "Conference", "conference"),
+    "workday rising": ("conference", "Conference", "conference"),
+    "industry conference": ("conference", "Conference", "conference"),
+    "analyst day": ("conference", "Conference", "conference"),
+
+    # Regulatory filings
+    "form 10-k": ("regulatory-filing", "Regulatory Filing", "regulatory_filing"),
+    "form 10-q": ("regulatory-filing", "Regulatory Filing", "regulatory_filing"),
+    "form 8-k": ("regulatory-filing", "Regulatory Filing", "regulatory_filing"),
+    "annual report": ("regulatory-filing", "Regulatory Filing", "regulatory_filing"),
+    "proxy statement": ("regulatory-filing", "Regulatory Filing", "regulatory_filing"),
+    "sec filing": ("regulatory-filing", "Regulatory Filing", "regulatory_filing"),
+}
+
 
 def get_all_lexicons() -> dict[str, dict]:
     """Return all lexicons for entity matching."""
@@ -289,6 +355,7 @@ def get_all_lexicons() -> dict[str, dict]:
         "capability": AI_CAPABILITY_LEXICON,
         "product": PRODUCT_LEXICON,
         "risk": RISK_LEXICON,
+        "event": EVENT_LEXICON,
     }
 
 

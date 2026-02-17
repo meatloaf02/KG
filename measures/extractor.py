@@ -1,8 +1,8 @@
 """
-Entity extraction from document text (NOR-107, NOR-108, NOR-109).
+Entity extraction from document text (NOR-107, NOR-108, NOR-109, NOR-136).
 
 Dictionary-based entity matching with normalization.
-Extracts capabilities, products, and risk topics from sentences.
+Extracts capabilities, products, risk topics, and events from sentences.
 """
 
 import re
@@ -12,6 +12,7 @@ from typing import Optional
 from config import setup_logging
 from measures.lexicons import (
     AI_CAPABILITY_LEXICON,
+    EVENT_LEXICON,
     PRODUCT_LEXICON,
     RISK_LEXICON,
     EntityMatch,
@@ -28,10 +29,16 @@ class ExtractionResult:
     capability_mentions: list[EntityMatch] = field(default_factory=list)
     product_mentions: list[EntityMatch] = field(default_factory=list)
     risk_mentions: list[EntityMatch] = field(default_factory=list)
+    event_mentions: list[EntityMatch] = field(default_factory=list)
 
     @property
     def total_mentions(self) -> int:
-        return len(self.capability_mentions) + len(self.product_mentions) + len(self.risk_mentions)
+        return (
+            len(self.capability_mentions)
+            + len(self.product_mentions)
+            + len(self.risk_mentions)
+            + len(self.event_mentions)
+        )
 
     @property
     def unique_capabilities(self) -> set[str]:
@@ -44,6 +51,10 @@ class ExtractionResult:
     @property
     def unique_risks(self) -> set[str]:
         return {m.entity_id for m in self.risk_mentions}
+
+    @property
+    def unique_events(self) -> set[str]:
+        return {m.entity_id for m in self.event_mentions}
 
 
 class EntityExtractor:
@@ -59,6 +70,7 @@ class EntityExtractor:
         self.capability_patterns = self._compile_patterns(AI_CAPABILITY_LEXICON)
         self.product_patterns = self._compile_patterns(PRODUCT_LEXICON)
         self.risk_patterns = self._compile_patterns(RISK_LEXICON)
+        self.event_patterns = self._compile_patterns(EVENT_LEXICON)
 
     def _compile_patterns(self, lexicon: dict) -> list[tuple[re.Pattern, tuple]]:
         """
@@ -72,8 +84,10 @@ class EntityExtractor:
             # Escape special regex chars and add word boundaries
             escaped = re.escape(surface_form)
             # Allow for hyphen/space variations
-            escaped = escaped.replace(r"\ ", r"[\s\-]")
+            # Important: replace hyphens before spaces to avoid corrupting
+            # the [\s\-] character class inserted by the space replacement.
             escaped = escaped.replace(r"\-", r"[\s\-]?")
+            escaped = escaped.replace(r"\ ", r"[\s\-]")
             pattern = re.compile(rf"\b{escaped}\b", re.IGNORECASE)
             patterns.append((pattern, surface_form, entity_info))
 
@@ -88,6 +102,7 @@ class EntityExtractor:
         extract_capabilities: bool = True,
         extract_products: bool = True,
         extract_risks: bool = True,
+        extract_events: bool = True,
     ) -> ExtractionResult:
         """
         Extract all entity mentions from text.
@@ -98,6 +113,7 @@ class EntityExtractor:
             extract_capabilities: Extract AI/ML capabilities
             extract_products: Extract Workday products
             extract_risks: Extract risk topics
+            extract_events: Extract events
 
         Returns:
             ExtractionResult with all mentions
@@ -122,6 +138,11 @@ class EntityExtractor:
                 text, self.risk_patterns, "risk"
             )
 
+        if extract_events:
+            result.event_mentions = self._extract_entities(
+                text, self.event_patterns, "event"
+            )
+
         return result
 
     def extract_from_sentences(
@@ -131,6 +152,7 @@ class EntityExtractor:
         extract_capabilities: bool = True,
         extract_products: bool = True,
         extract_risks: bool = True,
+        extract_events: bool = True,
     ) -> ExtractionResult:
         """
         Extract entities from pre-split sentences.
@@ -141,6 +163,7 @@ class EntityExtractor:
             extract_capabilities: Extract AI/ML capabilities
             extract_products: Extract Workday products
             extract_risks: Extract risk topics
+            extract_events: Extract events
 
         Returns:
             ExtractionResult with mentions including sentence IDs
@@ -175,6 +198,13 @@ class EntityExtractor:
                     sentence_id=sent_id, offset=sent_start
                 )
                 result.risk_mentions.extend(mentions)
+
+            if extract_events:
+                mentions = self._extract_entities(
+                    sent_text, self.event_patterns, "event",
+                    sentence_id=sent_id, offset=sent_start
+                )
+                result.event_mentions.extend(mentions)
 
         return result
 
