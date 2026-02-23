@@ -21,6 +21,15 @@ from process.doc_classifier import DocumentClassifier
 logger = setup_logging(__name__)
 
 
+def _assign_analysis_layer(doc_type: str, analysis_eligible: bool) -> str | None:
+    """Return the canonical version label for an eligible document."""
+    if not analysis_eligible:
+        return None
+    if doc_type in ("sec_10k", "sec_10q", "sec_8k"):
+        return "canonical_v2"
+    return "canonical_v1"  # DEF 14A and any future eligible types fall back to v1
+
+
 def _is_analysis_eligible(
     doc_type: str,
     doc_sub_type: str | None,
@@ -85,10 +94,12 @@ def reclassify_all(dry_run: bool = True) -> dict:
                 new_type, new_sub_type,
                 char_count=data.get("char_count", 0),
             )
+            new_layer = _assign_analysis_layer(new_type, new_eligible)
 
             old_type = data.get("doc_type")
             old_sub_type = data.get("doc_sub_type")
             old_eligible = data.get("analysis_eligible", False)
+            old_layer = data.get("analysis_layer")
 
             new_type_counts[new_type] += 1
             if new_type == "sec_other" and new_sub_type:
@@ -101,6 +112,7 @@ def reclassify_all(dry_run: bool = True) -> dict:
                 or new_confidence != data.get("doc_type_confidence")
                 or new_sub_type != old_sub_type
                 or new_eligible != old_eligible
+                or new_layer != old_layer
             ):
                 changed += 1
                 changes_detail.append({
@@ -117,6 +129,7 @@ def reclassify_all(dry_run: bool = True) -> dict:
                     data["doc_type_confidence"] = new_confidence
                     data["doc_sub_type"] = new_sub_type
                     data["analysis_eligible"] = new_eligible
+                    data["analysis_layer"] = new_layer
                     with open(json_path, "w", encoding="utf-8") as f:
                         json.dump(data, f, indent=2, ensure_ascii=False)
             else:

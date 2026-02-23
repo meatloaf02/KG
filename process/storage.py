@@ -61,6 +61,7 @@ class ProcessedDocument:
 
     # Analysis flags (defaulted for backward compat with existing JSONs)
     analysis_eligible: bool = False
+    analysis_layer: Optional[str] = None
 
     def to_dict(self) -> dict:
         """Convert to dictionary for serialization."""
@@ -70,6 +71,7 @@ class ProcessedDocument:
     def from_dict(cls, data: dict) -> "ProcessedDocument":
         """Create from dictionary."""
         data.setdefault("analysis_eligible", False)
+        data.setdefault("analysis_layer", None)
         return cls(**data)
 
 

@@ -67,6 +67,7 @@ def raw_to_document_node(
     doc_type = "html"
     doc_sub_type = None
     analysis_eligible = False
+    analysis_layer = None
     if raw.content_type:
         if "pdf" in raw.content_type.lower():
             doc_type = "pdf"
@@ -86,6 +87,7 @@ def raw_to_document_node(
             if processed.doc_sub_type:
                 doc_sub_type = processed.doc_sub_type
             analysis_eligible = getattr(processed, 'analysis_eligible', False)
+            analysis_layer = getattr(processed, 'analysis_layer', None)
             # Use processed document's title if available
             if processed.title:
                 title = processed.title
@@ -100,6 +102,7 @@ def raw_to_document_node(
         source_url=raw.url,
         doc_sub_type=doc_sub_type,
         analysis_eligible=analysis_eligible,
+        analysis_layer=analysis_layer,
     )
 
 
