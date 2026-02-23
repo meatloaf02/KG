@@ -141,6 +141,7 @@ ON CREATE SET
     d.doc_type = $doc_type,
     d.doc_sub_type = $doc_sub_type,
     d.analysis_eligible = $analysis_eligible,
+    d.analysis_layer = $analysis_layer,
     d.source_type = $source_type,
     d.publish_date = $publish_date,
     d.published_at = CASE WHEN $publish_date IS NOT NULL THEN date($publish_date) ELSE NULL END,
@@ -151,6 +152,7 @@ ON MATCH SET
     d.doc_type = $doc_type,
     d.doc_sub_type = $doc_sub_type,
     d.analysis_eligible = $analysis_eligible,
+    d.analysis_layer = $analysis_layer,
     d.publish_date = $publish_date,
     d.published_at = CASE WHEN $publish_date IS NOT NULL THEN date($publish_date) ELSE NULL END,
     d.updated_at = timestamp()
@@ -405,6 +407,7 @@ class DocumentNode:
     source_url: Optional[str] = None
     doc_sub_type: Optional[str] = None
     analysis_eligible: bool = False
+    analysis_layer: Optional[str] = None
 
     def to_dict(self) -> dict:
         """Convert to dictionary for Cypher parameters."""
@@ -418,6 +421,7 @@ class DocumentNode:
             "source_url": self.source_url,
             "doc_sub_type": self.doc_sub_type,
             "analysis_eligible": self.analysis_eligible,
+            "analysis_layer": self.analysis_layer,
         }
 
 

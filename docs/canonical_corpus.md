@@ -8,7 +8,8 @@ document represents **one primary narrative filing per SEC filing event**
 for Workday, Inc. (CIK 1327811) from fiscal Q4 2012 through Q4 2025.
 
 Only documents with `analysis_eligible = true` in the processed JSON
-files are included.
+files are included. Each eligible document is tagged with
+`analysis_layer = 'canonical_v1'` to version the corpus definition.
 
 ## Inclusion Rules
 
@@ -98,7 +99,8 @@ The following are explicitly excluded from the canonical corpus:
 ## Eligibility Logic
 
 Eligibility is determined by `_is_analysis_eligible()` in
-`process/reclassify.py`:
+`process/reclassify.py`. Documents that pass are assigned
+`analysis_layer = 'canonical_v1'`; all others receive `None`.
 
 ```python
 def _is_analysis_eligible(doc_type, doc_sub_type, char_count=0):
@@ -114,7 +116,14 @@ def _is_analysis_eligible(doc_type, doc_sub_type, char_count=0):
         if "2.02" in doc_sub_type or "8.01" in doc_sub_type:
             return True
     return False
+
+# After eligibility check:
+analysis_layer = "canonical_v1" if analysis_eligible else None
 ```
+
+The `analysis_layer` field versions the corpus so that future rule
+changes (e.g., adding earnings call transcripts) can coexist as
+`canonical_v2` without breaking consumers that depend on `canonical_v1`.
 
 ## Pipeline Commands
 
