@@ -36,6 +36,7 @@ NODE_PRODUCT = "Product"
 NODE_CAPABILITY = "Capability"
 NODE_RISK_TOPIC = "RiskTopic"
 NODE_EVENT = "Event"
+NODE_QUARTERLY_SIGNAL = "QuarterlySignal"
 
 # Relationship types
 REL_MENTIONS = "MENTIONS"
@@ -116,6 +117,11 @@ INDEX_QUERIES = [
     "CREATE INDEX ON :Event(name);",
     "CREATE INDEX ON :Event(event_type);",
     "CREATE INDEX ON :Event(event_date);",
+    # QuarterlySignal indexes
+    "CREATE INDEX ON :QuarterlySignal(period);",
+    "CREATE INDEX ON :QuarterlySignal(year);",
+    "CREATE INDEX ON :QuarterlySignal(quarter);",
+    "CREATE INDEX ON :QuarterlySignal(signal_type);",
 ]
 
 # Constraint queries (Memgraph supports unique constraints)
@@ -126,6 +132,7 @@ CONSTRAINT_QUERIES = [
     "CREATE CONSTRAINT ON (cap:Capability) ASSERT cap.id IS UNIQUE;",
     "CREATE CONSTRAINT ON (r:RiskTopic) ASSERT r.id IS UNIQUE;",
     "CREATE CONSTRAINT ON (e:Event) ASSERT e.id IS UNIQUE;",
+    "CREATE CONSTRAINT ON (qs:QuarterlySignal) ASSERT qs.period IS UNIQUE;",
 ]
 
 
@@ -319,6 +326,39 @@ ON CREATE SET
 RETURN r
 """
 
+CREATE_QUARTERLY_SIGNAL = """
+MERGE (qs:QuarterlySignal {period: $period})
+ON CREATE SET
+    qs.year                       = $year,
+    qs.quarter                    = $quarter,
+    qs.signal_type                = $signal_type,
+    qs.aii                        = $aii,
+    qs.aii_delta                  = $aii_delta,
+    qs.doc_count                  = $doc_count,
+    qs.quarter_raw_score          = $quarter_raw_score,
+    qs.quarter_tokens             = $quarter_tokens,
+    qs.avg_doc_type_weight        = $avg_doc_type_weight,
+    qs.bucket_classic_ai          = $bucket_classic_ai,
+    qs.bucket_generative_ai       = $bucket_generative_ai,
+    qs.bucket_adjacent_automation = $bucket_adjacent_automation,
+    qs.computed_at                = $computed_at,
+    qs.extractor_version          = $extractor_version,
+    qs.created_at                 = timestamp()
+ON MATCH SET
+    qs.aii                        = $aii,
+    qs.aii_delta                  = $aii_delta,
+    qs.doc_count                  = $doc_count,
+    qs.quarter_raw_score          = $quarter_raw_score,
+    qs.quarter_tokens             = $quarter_tokens,
+    qs.avg_doc_type_weight        = $avg_doc_type_weight,
+    qs.bucket_classic_ai          = $bucket_classic_ai,
+    qs.bucket_generative_ai       = $bucket_generative_ai,
+    qs.bucket_adjacent_automation = $bucket_adjacent_automation,
+    qs.computed_at                = $computed_at,
+    qs.updated_at                 = timestamp()
+RETURN qs
+"""
+
 
 # =============================================================================
 # Query Templates
@@ -506,6 +546,47 @@ class EventNode:
             "event_type": self.event_type,
             "event_date": self.event_date,
             "description": self.description,
+        }
+
+
+@dataclass
+class QuarterlySignalNode:
+    """QuarterlySignal node data for Memgraph (AII metric)."""
+
+    period: str                       # e.g. "2023-Q1" — primary key
+    year: int
+    quarter: int
+    signal_type: str                  # "aii"
+    aii: float
+    aii_delta: Optional[float]        # None for first available quarter
+    doc_count: int
+    quarter_raw_score: float
+    quarter_tokens: float
+    avg_doc_type_weight: float
+    bucket_classic_ai: int
+    bucket_generative_ai: int
+    bucket_adjacent_automation: int
+    computed_at: str                  # ISO-8601 datetime string
+    extractor_version: str = "1.0.0"
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for Cypher parameters."""
+        return {
+            "period": self.period,
+            "year": self.year,
+            "quarter": self.quarter,
+            "signal_type": self.signal_type,
+            "aii": self.aii,
+            "aii_delta": self.aii_delta,
+            "doc_count": self.doc_count,
+            "quarter_raw_score": self.quarter_raw_score,
+            "quarter_tokens": self.quarter_tokens,
+            "avg_doc_type_weight": self.avg_doc_type_weight,
+            "bucket_classic_ai": self.bucket_classic_ai,
+            "bucket_generative_ai": self.bucket_generative_ai,
+            "bucket_adjacent_automation": self.bucket_adjacent_automation,
+            "computed_at": self.computed_at,
+            "extractor_version": self.extractor_version,
         }
 
 

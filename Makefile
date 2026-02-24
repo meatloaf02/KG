@@ -1,4 +1,4 @@
-.PHONY: setup ingest init-ingest-db ingest-stats ingest-manifest build-db transform signals train clean test lint format hooks help
+.PHONY: setup ingest init-ingest-db ingest-stats ingest-manifest build-db transform signals aii train clean test lint format hooks help
 
 # Default target
 help:
@@ -9,6 +9,7 @@ help:
 	@echo "make build-db   - Create PostgreSQL schema and tables"
 	@echo "make transform  - Process raw data and load into KG"
 	@echo "make signals    - Compute quarterly signals"
+	@echo "make aii        - Compute AI Intensity Index (AII)"
 	@echo "make train      - Train predictive model"
 	@echo "make test       - Run test suite"
 	@echo "make lint       - Check code style with ruff"
@@ -55,6 +56,11 @@ transform:
 signals:
 	@echo "Computing signals..."
 	python -m measures.main
+
+# AII (AI Intensity Index)
+aii:
+	@echo "Computing AII..."
+	python3 -m measures.run_aii
 
 # Model training
 train:

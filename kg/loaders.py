@@ -44,12 +44,14 @@ from kg.schema import (
     CREATE_MENTIONS_PRODUCT,
     CREATE_OWNS,
     CREATE_PRODUCT,
+    CREATE_QUARTERLY_SIGNAL,
     CREATE_RISK_TOPIC,
     CapabilityNode,
     DocumentNode,
     EventNode,
     Evidence,
     ProductNode,
+    QuarterlySignalNode,
     RiskTopicNode,
 )
 
@@ -369,6 +371,37 @@ class KGLoader:
             return LoadResult.fail("No result returned")
         except Exception as e:
             logger.error(f"Failed to load event {params.get('id')}: {e}")
+            return LoadResult.fail(str(e))
+
+    def load_quarterly_signal(
+        self,
+        signal: Union[QuarterlySignalNode, dict],
+    ) -> LoadResult:
+        """
+        Load or update a QuarterlySignal node (idempotent MERGE on period).
+
+        Args:
+            signal: QuarterlySignalNode or dict with signal data.
+                    aii_delta may be None for the first available quarter.
+
+        Returns:
+            LoadResult with period as node_id.
+        """
+        if isinstance(signal, QuarterlySignalNode):
+            params = signal.to_dict()
+        else:
+            params = signal
+
+        if not params.get("period"):
+            return LoadResult.fail("period is required")
+
+        try:
+            results = execute_query(CREATE_QUARTERLY_SIGNAL, params, driver=self.driver)
+            if results:
+                return LoadResult.ok(params["period"])
+            return LoadResult.fail("No result returned")
+        except Exception as e:
+            logger.error(f"Failed to load QuarterlySignal {params.get('period')}: {e}")
             return LoadResult.fail(str(e))
 
     # =========================================================================
