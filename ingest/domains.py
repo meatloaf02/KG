@@ -40,6 +40,7 @@ class DomainConfig:
     description: str = ""
     requires_special_handling: bool = False
     notes: Optional[str] = None
+    tier: str = ""  # "tier1", "tier2", or "" for non-media domains
 
 
 # Allowed domains with their configurations
@@ -139,6 +140,144 @@ ALLOWED_DOMAINS: dict[str, DomainConfig] = {
         priority=Priority.MEDIUM,
         requests_per_second=0.3,
         description="PR Newswire press release distribution",
+    ),
+    # External media — Tier 1 (major news outlets)
+    "www.cnbc.com": DomainConfig(
+        domain="www.cnbc.com",
+        source_type=SourceType.NEWS_MEDIA,
+        priority=Priority.LOW,
+        requests_per_second=0.2,
+        description="CNBC technology and business news",
+        tier="tier1",
+    ),
+    "www.forbes.com": DomainConfig(
+        domain="www.forbes.com",
+        source_type=SourceType.NEWS_MEDIA,
+        priority=Priority.LOW,
+        requests_per_second=0.2,
+        description="Forbes business and technology coverage",
+        tier="tier1",
+    ),
+    "www.fastcompany.com": DomainConfig(
+        domain="www.fastcompany.com",
+        source_type=SourceType.NEWS_MEDIA,
+        priority=Priority.LOW,
+        requests_per_second=0.2,
+        description="Fast Company innovation and tech news",
+        tier="tier1",
+    ),
+    "fortune.com": DomainConfig(
+        domain="fortune.com",
+        source_type=SourceType.NEWS_MEDIA,
+        priority=Priority.LOW,
+        requests_per_second=0.2,
+        description="Fortune business news",
+        tier="tier1",
+    ),
+    # External media — Tier 2 (trade press and specialized publications)
+    "venturebeat.com": DomainConfig(
+        domain="venturebeat.com",
+        source_type=SourceType.NEWS_MEDIA,
+        priority=Priority.LOW,
+        requests_per_second=0.2,
+        description="VentureBeat AI and enterprise tech",
+        tier="tier2",
+    ),
+    "thenewstack.io": DomainConfig(
+        domain="thenewstack.io",
+        source_type=SourceType.NEWS_MEDIA,
+        priority=Priority.LOW,
+        requests_per_second=0.2,
+        description="The New Stack cloud-native and developer news",
+        tier="tier2",
+    ),
+    "siliconangle.com": DomainConfig(
+        domain="siliconangle.com",
+        source_type=SourceType.NEWS_MEDIA,
+        priority=Priority.LOW,
+        requests_per_second=0.2,
+        description="SiliconANGLE enterprise tech news",
+        tier="tier2",
+    ),
+    "cloudwars.com": DomainConfig(
+        domain="cloudwars.com",
+        source_type=SourceType.NEWS_MEDIA,
+        priority=Priority.LOW,
+        requests_per_second=0.2,
+        description="Cloud Wars enterprise cloud coverage",
+        tier="tier2",
+    ),
+    "www.hr-brew.com": DomainConfig(
+        domain="www.hr-brew.com",
+        source_type=SourceType.NEWS_MEDIA,
+        priority=Priority.LOW,
+        requests_per_second=0.2,
+        description="HR Brew human resources industry news",
+        tier="tier2",
+    ),
+    "www.cfo.com": DomainConfig(
+        domain="www.cfo.com",
+        source_type=SourceType.NEWS_MEDIA,
+        priority=Priority.LOW,
+        requests_per_second=0.2,
+        description="CFO.com finance leadership news",
+        tier="tier2",
+    ),
+    "www.newsweek.com": DomainConfig(
+        domain="www.newsweek.com",
+        source_type=SourceType.NEWS_MEDIA,
+        priority=Priority.LOW,
+        requests_per_second=0.2,
+        description="Newsweek general news",
+        tier="tier2",
+    ),
+    "www.thedrum.com": DomainConfig(
+        domain="www.thedrum.com",
+        source_type=SourceType.NEWS_MEDIA,
+        priority=Priority.LOW,
+        requests_per_second=0.2,
+        description="The Drum marketing and media news",
+        tier="tier2",
+    ),
+    "www.adweek.com": DomainConfig(
+        domain="www.adweek.com",
+        source_type=SourceType.NEWS_MEDIA,
+        priority=Priority.LOW,
+        requests_per_second=0.2,
+        description="Adweek advertising industry news",
+        tier="tier2",
+    ),
+    "aimagazine.com": DomainConfig(
+        domain="aimagazine.com",
+        source_type=SourceType.NEWS_MEDIA,
+        priority=Priority.LOW,
+        requests_per_second=0.2,
+        description="AI Magazine artificial intelligence coverage",
+        tier="tier2",
+    ),
+    "www.inc.com": DomainConfig(
+        domain="www.inc.com",
+        source_type=SourceType.NEWS_MEDIA,
+        priority=Priority.LOW,
+        requests_per_second=0.2,
+        description="Inc. small business and startup news",
+        tier="tier2",
+    ),
+    "futurecio.tech": DomainConfig(
+        domain="futurecio.tech",
+        source_type=SourceType.NEWS_MEDIA,
+        priority=Priority.LOW,
+        requests_per_second=0.2,
+        description="Future CIO technology leadership coverage",
+        tier="tier2",
+    ),
+    "www.afr.com": DomainConfig(
+        domain="www.afr.com",
+        source_type=SourceType.NEWS_MEDIA,
+        priority=Priority.LOW,
+        requests_per_second=0.2,
+        description="Australian Financial Review",
+        tier="tier2",
     ),
 }
 

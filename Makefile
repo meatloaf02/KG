@@ -1,4 +1,4 @@
-.PHONY: setup ingest init-ingest-db ingest-stats ingest-manifest build-db transform signals aii train clean test lint format hooks help
+.PHONY: setup ingest ingest-media init-ingest-db ingest-stats ingest-manifest build-db transform signals aii train clean test lint format hooks help
 
 # Default target
 help:
@@ -6,6 +6,7 @@ help:
 	@echo "================================================"
 	@echo "make setup      - Set up Python environment and install dependencies"
 	@echo "make ingest     - Collect data from public sources"
+	@echo "make ingest-media - One-shot external media crawl (see YAML spec)"
 	@echo "make build-db   - Create PostgreSQL schema and tables"
 	@echo "make transform  - Process raw data and load into KG"
 	@echo "make signals    - Compute quarterly signals"
@@ -28,6 +29,12 @@ setup:
 ingest:
 	@echo "Starting data ingestion..."
 	python -m ingest.run --seeds all
+
+# External media crawl
+ingest-media:  ## One-shot external media crawl (see YAML spec)
+	$(VENV)/python3 -m ingest.run_media \
+	  --seeds data_manifests/seeds/external_media.csv \
+	  --limit $(or $(LIMIT),20000)
 
 # Initialize ingestion database
 init-ingest-db:

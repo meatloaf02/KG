@@ -332,6 +332,75 @@ def compute_aii_index(driver=None) -> pd.DataFrame:
 
 
 # =============================================================================
+# Per-Doc-Type Quarterly Aggregation
+# =============================================================================
+
+
+def compute_aii_by_doctype(driver=None) -> pd.DataFrame:
+    """
+    Compute quarterly AII stratified by document type (long-form).
+
+    Returns one row per (quarter, doc_type) combination.
+    Columns match compute_aii_index() minus aii_delta, plus doc_type.
+    """
+    bucket_patterns = _build_all_patterns()
+    if driver is None:
+        driver = get_driver()
+    docs = fetch_canonical_docs(driver=driver)
+    storage = ProcessedDocumentStorage()
+
+    # Group by (year, quarter, doc_type)
+    strat_data: dict[tuple, list[dict]] = defaultdict(list)
+    for doc in docs:
+        content_hash = doc["content_hash"]
+        doc_type = doc["doc_type"]
+        year, quarter = doc["year"], doc["quarter"]
+        text = storage.load_text(content_hash)
+        if text is None:
+            continue
+        components = compute_doc_aii(text, doc_type, bucket_patterns)
+        if components is None:
+            continue
+        strat_data[(year, quarter, doc_type)].append(components)
+
+    rows = []
+    for (year, quarter, doc_type), doc_components in sorted(strat_data.items()):
+        n = len(doc_components)
+        quarter_raw = sum(d["raw_score"] for d in doc_components)
+        quarter_tokens = sum(d["token_count"] for d in doc_components)
+        avg_weight = sum(d["doc_type_weight"] for d in doc_components) / n
+        if quarter_tokens == 0:
+            continue
+        aii = (quarter_raw / quarter_tokens) * AII_MULTIPLIER * avg_weight
+        bucket_totals = {
+            b: sum(d["bucket_counts"].get(b, 0) for d in doc_components)
+            for b in AII_TERM_BUCKETS
+        }
+        rows.append({
+            "period": f"{year}-Q{quarter}",
+            "year": year,
+            "quarter": quarter,
+            "doc_type": doc_type,
+            "doc_count": n,
+            "aii": round(aii, 6),
+            "quarter_raw_score": round(quarter_raw, 4),
+            "quarter_tokens": round(quarter_tokens, 1),
+            "avg_doc_type_weight": round(avg_weight, 4),
+            "bucket_classic_ai": bucket_totals["classic_ai"],
+            "bucket_generative_ai": bucket_totals["generative_ai"],
+            "bucket_adjacent_automation": bucket_totals["adjacent_automation"],
+        })
+
+    col_order = [
+        "period", "year", "quarter", "doc_type", "doc_count",
+        "aii", "quarter_raw_score", "quarter_tokens", "avg_doc_type_weight",
+        "bucket_classic_ai", "bucket_generative_ai", "bucket_adjacent_automation",
+    ]
+    df = pd.DataFrame(rows).sort_values(["year", "quarter", "doc_type"]).reset_index(drop=True)
+    return df[col_order]
+
+
+# =============================================================================
 # CSV Export
 # =============================================================================
 

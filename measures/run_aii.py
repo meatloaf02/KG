@@ -23,12 +23,13 @@ from config import PROCESSED_DATA_DIR, setup_logging
 from kg.connection import execute_query, get_driver
 from kg.loaders import KGLoader
 from kg.schema import QuarterlySignalNode
-from measures.aii import compute_aii_index, save_aii_csv
+from measures.aii import compute_aii_index, compute_aii_by_doctype, save_aii_csv
 
 logger = setup_logging(__name__)
 
 AII_VERSION = "1.0.0"
 AII_CSV_PATH = PROCESSED_DATA_DIR / "aii_quarterly.csv"
+AII_BY_DOCTYPE_CSV_PATH = PROCESSED_DATA_DIR / "aii_by_doctype.csv"
 
 STATS_QUERY = """
 MATCH (qs:QuarterlySignal)
@@ -168,6 +169,11 @@ def main() -> None:
     csv_path = Path(args.output) if args.output else AII_CSV_PATH
     save_aii_csv(df, csv_path)
     print(f"\nCSV: {csv_path}")
+
+    # 3b. Write by-doctype CSV
+    df_by_type = compute_aii_by_doctype(driver=driver)
+    save_aii_csv(df_by_type, AII_BY_DOCTYPE_CSV_PATH)
+    print(f"CSV (by doc type): {AII_BY_DOCTYPE_CSV_PATH}")
 
     # 4. Write to Memgraph (unless dry-run)
     if not args.dry_run:

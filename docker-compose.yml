@@ -24,6 +24,13 @@ services:
       timeout: 5s
       retries: 5
 
+  notebook:
+    image: jupyter/scipy-notebook:latest
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./:/home/jovyan/work
+
   # PostgreSQL - Raw Document Metadata (already exists locally, optional here)
   postgres:
     image: postgres:14-alpine

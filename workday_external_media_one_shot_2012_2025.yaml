@@ -1,0 +1,287 @@
+crawler:
+  name: workday_external_media_one_shot_2012_2025
+  run_mode: one_shot
+  description: >
+    One-shot focused crawler to ingest external media articles that mention Workday (WDAY)
+    for downstream sentiment + AI-mention analysis. Time window: 2012–2025.
+    Paywalled pages are excluded entirely (not stored in any form).
+
+targets:
+  company:
+    name: Workday
+    ticker: WDAY
+    cik: "1327811"                 # optional; useful for disambiguation and metadata joins
+  scope:
+    languages_allowlist: ["en"]
+    publish_date:
+      start: "2012-01-01"
+      end: "2025-12-31"
+    doc_types_allowlist: ["html_article"]
+    paywall_policy:
+      exclude_paywalled: true      # hard exclusion
+      store_paywalled_metadata: false
+      store_paywalled_text: false
+
+seeding:
+  # For a one-shot crawl, prioritize seeding breadth over deep expansion.
+  strategy: ["search", "rss", "sitemap"]
+  search:
+    provider: "serp"               # placeholder: SerpAPI/Bing/etc.
+    max_results_per_query: 300
+    queries:
+      # Core entity / finance context
+      - '"Workday" (WDAY OR "Workday, Inc." OR NASDAQ)'
+      # AI framing
+      - '"Workday" (AI OR "artificial intelligence" OR "machine learning" OR genAI OR "generative AI" OR "AI agents" OR agentic)'
+      # Product/context disambiguation (reduce "work day")
+      - '"Workday" (HCM OR "Human Capital" OR "Financial Management" OR "Workday Student" OR "Workday Recruiting" OR ERP)'
+      # Coverage spikes: earnings + events
+      - '"Workday" (earnings OR guidance OR "quarter results" OR "Workday Rising" OR "analyst day")'
+  rss:
+    enabled: true
+    feeds: []                      # add publisher RSS endpoints if you curate them
+  sitemap:
+    enabled: true
+    known_sitemaps: []             # optional: curated sitemap URLs; otherwise try /sitemap.xml patterns
+
+domain_policy:
+  # Tier 1 + Tier 2 (editorial/news + trade press).
+  # NOTE: Domains that are frequently paywalled are intentionally excluded from allowlist
+  # (e.g., wsj.com, bloomberg.com). Metered sites may still produce paywalled pages; those pages are dropped.
+  allowlist:
+    tier1:
+      - "www.cnbc.com"
+      - "www.forbes.com"
+      - "www.fastcompany.com"
+      # Optional meter-risk but often accessible; keep if you want, paywalled pages will be dropped:
+      - "fortune.com"
+    tier2:
+      - "venturebeat.com"
+      - "thenewstack.io"
+      - "siliconangle.com"
+      - "cloudwars.com"
+      - "www.hr-brew.com"
+      - "www.cfo.com"
+      - "www.newsweek.com"
+      - "www.thedrum.com"
+      - "www.adweek.com"
+      - "aimagazine.com"
+      - "www.inc.com"
+      - "futurecio.tech"
+      - "www.afr.com"              # may be paywalled frequently; pages will be dropped if so
+  blocklist:
+    domains:
+      # Explicitly exclude commonly paywalled outlets entirely to avoid wasted fetches.
+      - "www.wsj.com"
+      - "wsj.com"
+      - "www.bloomberg.com"
+      - "bloomberg.com"
+      - "www.washingtonpost.com"
+      - "washingtonpost.com"
+    path_regex:
+      - "/tag/"
+      - "/category/"
+      - "/topics/"
+      - "/author/"
+      - "/newsletter"
+      - "/subscribe"
+      - "/subscription"
+      - "/account"
+      - "/login"
+      - "/signin"
+      - "/privacy"
+      - "/terms"
+      - "/careers"
+      - "/about"
+
+fetch:
+  user_agent: "Mozilla/5.0 (compatible; WorkdaySentimentResearchBot/1.0)"
+  obey_robots_txt: true
+  politeness:
+    per_domain_max_qps: 0.2        # 1 request / 5s per domain
+    max_concurrency_global: 8
+    max_concurrency_per_domain: 2
+  http:
+    timeout_seconds: 30
+    max_retries: 2
+    retry_backoff_seconds: [2, 10]
+    accept_mime_types: ["text/html"]
+    store_response_headers: true
+
+extraction:
+  html:
+    article_extractor: "trafilatura"     # or readability-lxml
+    keep_raw_html: true                  # store raw only for non-paywalled pages
+    text_normalization:
+      strip_boilerplate: true
+      normalize_whitespace: true
+  metadata:
+    extract_title: true
+    extract_author: true
+    extract_publish_date: true
+    extract_canonical_url: true
+    detect_language: true
+    publish_date_confidence: true
+
+relevance_filter:
+  # Stage 1: cheap include check
+  stage1_keyword_screen:
+    any_of:
+      - "Workday"
+      - "WDAY"
+      - "Workday, Inc."
+      - "Workday Student"
+      - "Workday HCM"
+  # Stage 2: disambiguate "work day" false positives
+  stage2_disambiguation:
+    require_any_of_if_only_workday_token_present:
+      - "NASDAQ"
+      - "WDAY"
+      - "HCM"
+      - "Human Capital"
+      - "Financial Management"
+      - "enterprise software"
+      - "Workday Student"
+      - "Workday Recruiting"
+  ai_keyword_flag:
+    any_of:
+      - "AI"
+      - "artificial intelligence"
+      - "machine learning"
+      - "generative AI"
+      - "genAI"
+      - "AI agents"
+      - "agentic"
+
+paywall_detection:
+  enabled: true
+  # If any paywall signal triggers, drop the page and do not store text/metadata.
+  action_on_paywall: "drop"
+  signals:
+    http_status_any: [402, 403, 451]
+    html_title_regex_any:
+      - "(?i)subscribe"
+      - "(?i)subscription"
+      - "(?i)sign in"
+      - "(?i)log in"
+    html_body_regex_any:
+      - "(?i)you have reached your limit"
+      - "(?i)to continue reading"
+      - "(?i)subscribe to continue"
+      - "(?i)this content is available to subscribers"
+      - "(?i)already a subscriber"
+      - "(?i)purchase a subscription"
+
+deduplication:
+  canonicalize_url:
+    drop_query_params:
+      - "utm_source"
+      - "utm_medium"
+      - "utm_campaign"
+      - "utm_term"
+      - "utm_content"
+      - "fbclid"
+      - "gclid"
+    force_https: true
+  content_hash:
+    algo: "sha256"
+    scope: "clean_text"
+  near_duplicate:
+    enabled: true
+    method: "simhash"
+    hamming_threshold: 4
+
+storage:
+  manifest_db:
+    type: "postgres"
+    table: "document_manifest"
+    upsert_key: "content_hash"
+    fields:
+      - content_hash
+      - url
+      - canonical_url
+      - url_hash
+      - source_type              # "external_media"
+      - publisher
+      - domain
+      - tier
+      - title
+      - author
+      - publish_date
+      - publish_date_confidence
+      - fetched_at
+      - http_status
+      - mime
+      - size_bytes
+      - language
+      - is_paywalled            # should always be false for stored docs
+      - workday_match_type
+      - ai_keyword_hit
+      - near_dup_cluster_id
+      - dup_of_hash
+      - parser_version
+  text_blobs:
+    type: "filesystem"
+    root: "data/interim"
+    layout: "{hash_prefix}/{content_hash}.json"
+    include_fields:
+      - clean_text
+      - raw_html_optional
+
+link_expansion:
+  enabled: true
+  # One-shot + seed-heavy: keep conservative.
+  max_outlinks_per_page: 15
+  follow_rules:
+    same_domain_only: true
+    require_article_like_url: true
+    article_url_regex_any:
+      - "/\\d{4}/\\d{2}/"
+      - "/\\d{4}-\\d{2}-\\d{2}/"
+      - "/news/"
+      - "/article"
+  stop_conditions:
+    max_pages_total: 20000
+    max_pages_per_domain: 2500
+    max_non_article_pages_per_100_articles: 10
+
+outputs:
+  required_artifacts:
+    - "document_manifest rows"
+    - "clean_text blobs"
+    - "crawl_run_report.json"
+  crawl_run_report:
+    metrics:
+      - fetched_total
+      - fetched_success
+      - fetched_failed
+      - dropped_paywalled_total
+      - dropped_out_of_window_total
+      - dropped_not_relevant_total
+      - stored_docs_total
+      - stored_docs_by_domain
+      - dedup_exact_rate
+      - dedup_near_rate
+      - publish_date_coverage_rate
+      - workday_relevance_pass_rate
+      - ai_keyword_hit_rate
+
+acceptance_criteria:
+  one_shot_success:
+    - "Run completes without fatal errors and produces crawl_run_report.json"
+    - "Idempotent: re-run produces no duplicate manifest rows (upsert on content_hash)"
+  scope_quality:
+    - ">= 90% Workday-company relevance in a 100-doc labeled QA sample"
+  window_conformance:
+    - ">= 95% of stored docs have publish_date between 2012-01-01 and 2025-12-31"
+  paywall_exclusion:
+    - "0 stored docs flagged is_paywalled=true"
+    - "dropped_paywalled_total reported in crawl_run_report.json"
+  extraction_quality:
+    - ">= 85% of QA sample has clean main-body text (minimal boilerplate)"
+    - ">= 90% publish_date coverage overall; >= 80% medium+ confidence"
+  deduplication:
+    - "100% exact duplicates removed by content_hash"
+    - ">= 80% of syndicated near-dups clustered correctly in QA sample"
+  ai_readiness:
+    - ">= 95% of stored docs have ai_keyword_hit computed"
